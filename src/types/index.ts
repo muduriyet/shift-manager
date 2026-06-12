@@ -33,7 +33,6 @@ export interface Employee {
   role: RoleName;
   status: EmployeeStatus;
   team: number;
-  codes: ShiftCodeKey[];
   defaultShift: ShiftCodeKey;
   startDate: string | null;
   endDate: string | null;

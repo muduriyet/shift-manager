@@ -46,7 +46,6 @@ function toEmployee(r: EmpRow): Employee {
     role: r.role as RoleName,
     status: r.status as EmployeeStatus,
     team: r.team,
-    codes: r.codes as ShiftCodeKey[],
     defaultShift: r.default_shift as ShiftCodeKey,
     startDate: r.start_date ?? null,
     endDate: r.end_date ?? null,
