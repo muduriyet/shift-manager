@@ -32,7 +32,6 @@ export interface Employee {
   dept: DepartmentName;
   role: RoleName;
   status: EmployeeStatus;
-  team: number;
   defaultShift: ShiftCodeKey;
   startDate: string | null;
   endDate: string | null;
@@ -82,10 +81,3 @@ export interface NavItem {
   icon: string;
 }
 
-export interface RawRosterEntry {
-  id: number;
-  name: string;
-  team: number;
-  role: string;
-  codes: ShiftCodeKey[];
-}

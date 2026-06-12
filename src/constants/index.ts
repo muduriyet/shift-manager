@@ -33,7 +33,6 @@ export function shiftById(id: ShiftCodeKey): ShiftTime {
   return SHIFT_TIMES.find(s => s.id === id) ?? SHIFT_TIMES[0];
 }
 
-export const TEAM_NAMES = ['A Ekibi', 'B Ekibi', 'C Ekibi', 'D Ekibi', 'E Ekibi', 'F Ekibi'];
 
 export const GROUP_COLORS: Record<DepartmentName, string> = {
   Akaryakıt: '#1e3a8a',

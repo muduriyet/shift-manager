@@ -13,8 +13,6 @@ interface EmpRow {
   dept: string;
   role: string;
   status: string;
-  team: number;
-  codes: string[];
   default_shift: string;
   start_date: string | null;
   end_date: string | null;
@@ -45,7 +43,6 @@ function toEmployee(r: EmpRow): Employee {
     dept: r.dept as DepartmentName,
     role: r.role as RoleName,
     status: r.status as EmployeeStatus,
-    team: r.team,
     defaultShift: r.default_shift as ShiftCodeKey,
     startDate: r.start_date ?? null,
     endDate: r.end_date ?? null,
@@ -98,8 +95,6 @@ export async function createEmployee(form: {
       dept: form.dept,
       role: form.role,
       status: form.status,
-      team: -1,
-      codes: Array(30).fill('İ'),
       default_shift: 'İ',
       start_date: form.startDate || null,
       end_date: form.endDate || null,
