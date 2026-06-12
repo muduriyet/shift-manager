@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import type { Employee, StationName, DepartmentName, RoleName, EmployeeStatus } from '../../types';
-import { STATIONS, DEPARTMENTS, ROLES } from '../../constants';
 import { Dialog } from '../ui/Dialog';
 import { Button } from '../ui/Button';
 import { Field, Input } from '../ui/Field';
@@ -37,17 +36,20 @@ function validate(form: EmployeeFormData): FormErrors {
 
 interface EmployeeModalProps {
   employee: Employee | null;
+  stationNames: string[];
+  deptNames: string[];
+  roleNames: string[];
   onClose: () => void;
   onSave: (form: EmployeeFormData, id: number | null) => void;
 }
 
-export function EmployeeModal({ employee, onClose, onSave }: EmployeeModalProps) {
+export function EmployeeModal({ employee, stationNames, deptNames, roleNames, onClose, onSave }: EmployeeModalProps) {
   const editing = !!employee;
   const [form, setForm] = useState<EmployeeFormData>({
     name:      employee?.name      ?? '',
-    station:   employee?.station   ?? STATIONS[0],
-    dept:      employee?.dept      ?? DEPARTMENTS[0],
-    role:      employee?.role      ?? ROLES[0],
+    station:   employee?.station   ?? stationNames[0] ?? '',
+    dept:      employee?.dept      ?? deptNames[0]    ?? '',
+    role:      employee?.role      ?? roleNames[0] ?? '',
     status:    employee?.status    ?? 'Aktif',
     startDate: employee?.startDate ?? null,
     endDate:   employee?.endDate   ?? null,
@@ -106,14 +108,14 @@ export function EmployeeModal({ employee, onClose, onSave }: EmployeeModalProps)
         </div>
 
         <Field label="İstasyon">
-          <Select value={form.station} onChange={v => set('station', v as StationName)} icon="pin" options={STATIONS} />
+          <Select value={form.station} onChange={v => set('station', v as StationName)} icon="pin" options={stationNames} />
         </Field>
         <Field label="Departman">
-          <Select value={form.dept} onChange={v => set('dept', v as DepartmentName)} icon="layers" options={DEPARTMENTS} />
+          <Select value={form.dept} onChange={v => set('dept', v as DepartmentName)} icon="layers" options={deptNames} />
         </Field>
 
         <Field label="Görev">
-          <Select value={form.role} onChange={v => set('role', v as RoleName)} options={ROLES} />
+          <Select value={form.role} onChange={v => set('role', v as RoleName)} options={roleNames} />
         </Field>
 
         <div>

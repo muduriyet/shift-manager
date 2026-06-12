@@ -1,10 +1,13 @@
 import { useState, useCallback, useEffect } from 'react';
-import type { ViewId, ScheduleMode, Employee, Shift, ShiftStatus, ShiftCodeKey, StationName, DepartmentName, RoleName } from './types';
+import type { ViewId, ScheduleMode, Employee, Shift, ShiftStatus, ShiftCodeKey, StationName, DepartmentName, RoleName, Station, Department, Role } from './types';
 import { SHIFT_CODES, WORK_CODES } from './constants';
 import {
   fetchEmployees, fetchShifts,
   createEmployee, updateEmployee, deleteEmployee,
   createShift, updateShift, updateShiftStatus, deleteShift,
+  fetchStations, createStation, deleteStation,
+  fetchDepartments, createDepartment, deleteDepartment,
+  fetchRoles, createRole, deleteRole,
 } from './lib/db';
 import { Sidebar, TopbarMobile, ToastStack } from './components/layout/Sidebar';
 import { ScheduleScreen } from './components/schedule/ScheduleScreen';
@@ -61,6 +64,9 @@ export default function App() {
   const [mode,        setMode]        = useState<ScheduleMode>(() => (localStorage.getItem('vy_mode') as ScheduleMode) ?? 'ay');
   const [station,     setStation]     = useState('Tümü');
   const [dept,        setDept]        = useState('Tümü');
+  const [stations,    setStations]    = useState<Station[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [roles,       setRoles]       = useState<Role[]>([]);
   const [employees,   setEmployees]   = useState<Employee[]>([]);
   const [shifts,      setShifts]      = useState<Shift[]>([]);
   const [activeMonth, setActiveMonth] = useState<string>(todayYearMonth);
@@ -80,7 +86,12 @@ export default function App() {
   useEffect(() => {
     async function load() {
       try {
-        const [emps, shfts] = await Promise.all([fetchEmployees(), fetchShifts()]);
+        const [sts, depts, rls, emps, shfts] = await Promise.all([
+          fetchStations(), fetchDepartments(), fetchRoles(), fetchEmployees(), fetchShifts(),
+        ]);
+        setStations(sts);
+        setDepartments(depts);
+        setRoles(rls);
         setEmployees(emps);
         setShifts(shfts);
       } catch (err) {
@@ -99,6 +110,47 @@ export default function App() {
     setToasts(t => [...t, { id, msg }]);
     setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 2600);
   }, []);
+
+  const stationNames = stations.map(s => s.name);
+  const deptNames    = departments.map(d => d.name);
+  const roleNames    = roles.map(r => r.name);
+  const deptColors   = Object.fromEntries(departments.map(d => [d.name, d.color]));
+
+  async function handleAddStation(name: string) {
+    const s = await createStation(name);
+    setStations(prev => [...prev, s]);
+    toast(`${name} istasyonu eklendi`);
+  }
+
+  async function handleDeleteStation(id: number) {
+    await deleteStation(id);
+    setStations(prev => prev.filter(s => s.id !== id));
+    toast('İstasyon silindi');
+  }
+
+  async function handleAddDepartment(name: string, color: string) {
+    const d = await createDepartment(name, color);
+    setDepartments(prev => [...prev, d]);
+    toast(`${name} departmanı eklendi`);
+  }
+
+  async function handleDeleteDepartment(id: number) {
+    await deleteDepartment(id);
+    setDepartments(prev => prev.filter(d => d.id !== id));
+    toast('Departman silindi');
+  }
+
+  async function handleAddRole(name: string) {
+    const r = await createRole(name);
+    setRoles(prev => [...prev, r]);
+    toast(`${name} görevi eklendi`);
+  }
+
+  async function handleDeleteRole(id: number) {
+    await deleteRole(id);
+    setRoles(prev => prev.filter(r => r.id !== id));
+    toast('Görev silindi');
+  }
 
   // Derive monthly codes directly from the shifts array — no separate state needed
   // No record = '-' (boş/unassigned). İ and Yİ are stored explicitly as records.
@@ -192,9 +244,22 @@ export default function App() {
   }
 
   async function handleSaveEmployee(form: EmployeeFormData, id: number | null) {
+    // İstasyon/departman/görev adlarını FK id'lerine çevir (DB id ile tutuyor, UI isimle çalışıyor)
+    const stationId = stations.find(s => s.name === form.station)?.id;
+    const deptId    = departments.find(d => d.name === form.dept)?.id;
+    const roleId    = roles.find(r => r.name === form.role)?.id;
+    if (stationId == null || deptId == null || roleId == null) {
+      toast('Geçersiz istasyon, departman veya görev');
+      return;
+    }
+    const payload = {
+      name: form.name, stationId, deptId, roleId,
+      status: form.status,
+      startDate: form.startDate, endDate: form.endDate,
+    };
     try {
       if (id !== null) {
-        const updated = await updateEmployee(id, form);
+        const updated = await updateEmployee(id, payload);
         setEmployees(prev => prev.map(e => e.id === id ? updated : e));
         setShifts(prev => prev.map(s =>
           s.empId === id ? { ...s, role: form.role, station: form.station, dept: form.dept } : s
@@ -215,7 +280,7 @@ export default function App() {
 
         toast(form.name + ' güncellendi' + (outOfRange.length > 0 ? ` · ${outOfRange.length} vardiya silindi` : ''));
       } else {
-        const newEmp = await createEmployee(form);
+        const newEmp = await createEmployee(payload);
         setEmployees(prev => [...prev, newEmp]);
         toast(form.name + ' eklendi');
       }
@@ -265,6 +330,9 @@ export default function App() {
         <ScheduleScreen
           shifts={shifts}
           employees={employees}
+          stationNames={stationNames}
+          deptNames={deptNames}
+          deptColors={deptColors}
           station={station} setStation={setStation}
           dept={dept} setDept={setDept}
           mode={mode} setMode={setMode}
@@ -279,6 +347,8 @@ export default function App() {
       screen = (
         <EmployeesScreen
           employees={employees}
+          stationNames={stationNames}
+          deptNames={deptNames}
           onEdit={e => { setEmpToEdit(e); setEmpModalOpen(true); }}
           onAdd={() => { setEmpToEdit(null); setEmpModalOpen(true); }}
           onDelete={handleDeleteEmployee}
@@ -290,6 +360,8 @@ export default function App() {
         <DailyScreen
           shifts={shifts}
           employees={employees}
+          stationNames={stationNames}
+          deptNames={deptNames}
           station={station} setStation={setStation}
           dept={dept} setDept={setDept}
           setStatus={handleSetStatus}
@@ -297,10 +369,24 @@ export default function App() {
       );
       break;
     case 'raporlar':
-      screen = <ReportsScreen employees={employees} shifts={shifts} />;
+      screen = <ReportsScreen employees={employees} shifts={shifts} stationNames={stationNames} deptNames={deptNames} />;
       break;
     case 'ayarlar':
-      screen = <SettingsScreen employees={employees} onToast={toast} />;
+      screen = (
+        <SettingsScreen
+          employees={employees}
+          stations={stations}
+          departments={departments}
+          roles={roles}
+          onAddStation={handleAddStation}
+          onDeleteStation={handleDeleteStation}
+          onAddDepartment={handleAddDepartment}
+          onDeleteDepartment={handleDeleteDepartment}
+          onAddRole={handleAddRole}
+          onDeleteRole={handleDeleteRole}
+          onToast={toast}
+        />
+      );
       break;
   }
 
@@ -323,6 +409,9 @@ export default function App() {
         <ShiftModal
           shift={shiftToEdit}
           employees={employees}
+          stationNames={stationNames}
+          deptNames={deptNames}
+          roleNames={roleNames}
           onClose={() => { setShiftModalOpen(false); setShiftToEdit(null); }}
           onSave={(form, id) => handleSaveShift(form as ShiftFormData, id)}
         />
@@ -330,6 +419,9 @@ export default function App() {
       {empModalOpen && (
         <EmployeeModal
           employee={empToEdit}
+          stationNames={stationNames}
+          deptNames={deptNames}
+          roleNames={roleNames}
           onClose={() => { setEmpModalOpen(false); setEmpToEdit(null); }}
           onSave={(form, id) => handleSaveEmployee(form as EmployeeFormData, id)}
         />

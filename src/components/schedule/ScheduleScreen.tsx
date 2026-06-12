@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Shift, Employee, ShiftCodeKey, ScheduleMode, MonthGroup } from '../../types';
 import {
-  STATIONS, DEPARTMENTS, MONTH_NAMES, MONTH_SHORT_NAMES,
+  MONTH_NAMES, MONTH_SHORT_NAMES,
   TODAY_DATE, TODAY_DATE_STR, WORK_CODES,
   getMonday, addDays, buildWeekDays, buildMonthDays, getMonthLabel,
 } from '../../constants';
@@ -13,19 +13,22 @@ import { CodeLegend } from './CodeLegend';
 import { WeeklyView } from './WeeklyView';
 import { MonthlyView } from './MonthlyView';
 
-function buildMonthGroups(emps: Employee[]): MonthGroup[] {
-  const COLORS: Record<string, string> = { Akaryakıt: '#1e3a8a', Market: '#0f766e' };
-  const order: [string, string][] = [
-    ['Ümraniye', 'Akaryakıt'], ['Ümraniye', 'Market'],
-    ['Şile', 'Akaryakıt'],     ['Şile', 'Market'],
-  ];
-  return order
-    .map(([st, dp]) => ({
-      label: `${st} / ${dp}`,
-      color: COLORS[dp] ?? '#64748b',
-      emps: emps.filter(e => e.station === st && e.dept === dp),
-    }))
-    .filter(g => g.emps.length > 0);
+function buildMonthGroups(
+  emps: Employee[],
+  stationNames: string[],
+  deptNames: string[],
+  deptColors: Record<string, string>,
+): MonthGroup[] {
+  const groups: MonthGroup[] = [];
+  stationNames.forEach(st =>
+    deptNames.forEach(dp => {
+      const group_emps = emps.filter(e => e.station === st && e.dept === dp);
+      if (group_emps.length > 0) {
+        groups.push({ label: `${st} / ${dp}`, color: deptColors[dp] ?? '#64748b', emps: group_emps });
+      }
+    })
+  );
+  return groups;
 }
 
 function shiftYearMonth(ym: string, delta: number): string {
@@ -37,6 +40,9 @@ function shiftYearMonth(ym: string, delta: number): string {
 interface ScheduleScreenProps {
   shifts: Shift[];
   employees: Employee[];
+  stationNames: string[];
+  deptNames: string[];
+  deptColors: Record<string, string>;
   station: string;
   setStation: (s: string) => void;
   dept: string;
@@ -52,7 +58,8 @@ interface ScheduleScreenProps {
 }
 
 export function ScheduleScreen({
-  shifts, employees, station, setStation, dept, setDept,
+  shifts, employees, stationNames, deptNames, deptColors,
+  station, setStation, dept, setDept,
   mode, setMode, activeMonth, setActiveMonth,
   codesOf, setCode, onNewShift, onShiftClick,
 }: ScheduleScreenProps) {
@@ -101,14 +108,14 @@ export function ScheduleScreen({
   );
 
   const weekGroups: MonthGroup[] = [];
-  STATIONS.forEach(st => DEPARTMENTS.forEach(dp => {
+  stationNames.forEach(st => deptNames.forEach(dp => {
     if (station !== 'Tümü' && st !== station) return;
     if (dept !== 'Tümü' && dp !== dept) return;
     const emps = filtered.filter(e => e.station === st && e.dept === dp);
-    if (emps.length) weekGroups.push({ label: `${st} / ${dp}`, color: '', emps });
+    if (emps.length) weekGroups.push({ label: `${st} / ${dp}`, color: deptColors[dp] ?? '#64748b', emps });
   }));
 
-  const monthGroups = buildMonthGroups(filtered);
+  const monthGroups = buildMonthGroups(filtered, stationNames, deptNames, deptColors);
 
   const todayStr = `${TODAY_DATE.getDate()} ${MONTH_SHORT_NAMES[TODAY_DATE.getMonth()]} ${TODAY_DATE.getFullYear()}`;
 
@@ -166,13 +173,13 @@ export function ScheduleScreen({
             value={station}
             onChange={v => setStation(String(v))}
             icon="pin"
-            options={['Tümü', ...STATIONS].map(s => ({ value: s, label: s === 'Tümü' ? 'Tüm İstasyonlar' : s }))}
+            options={['Tümü', ...stationNames].map(s => ({ value: s, label: s === 'Tümü' ? 'Tüm İstasyonlar' : s }))}
           />
           <Select
             value={dept}
             onChange={v => setDept(String(v))}
             icon="layers"
-            options={['Tümü', ...DEPARTMENTS].map(s => ({ value: s, label: s === 'Tümü' ? 'Tüm Departmanlar' : s }))}
+            options={['Tümü', ...deptNames].map(s => ({ value: s, label: s === 'Tümü' ? 'Tüm Departmanlar' : s }))}
           />
         </div>
         <div className="desk-only">

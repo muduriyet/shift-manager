@@ -1,11 +1,8 @@
 import type {
-  StationName, DepartmentName, RoleName, ShiftCodeKey,
+  ShiftCodeKey,
   ShiftStatus, ShiftCodeDef, MonthDay, WeekDay, ShiftTime,
 } from '../types';
 
-export const STATIONS: StationName[] = ['Ümraniye', 'Şile'];
-export const DEPARTMENTS: DepartmentName[] = ['Akaryakıt', 'Market'];
-export const ROLES: RoleName[] = ['Pompacı', 'Vardiya Amiri', 'Market Görevlisi', 'Kasiyer'];
 export const STATUSES: ShiftStatus[] = ['Planlandı', 'Geldi', 'Gelmedi'];
 
 export const SHIFT_CODES: Record<ShiftCodeKey, ShiftCodeDef> = {
@@ -33,11 +30,6 @@ export function shiftById(id: ShiftCodeKey): ShiftTime {
   return SHIFT_TIMES.find(s => s.id === id) ?? SHIFT_TIMES[0];
 }
 
-
-export const GROUP_COLORS: Record<DepartmentName, string> = {
-  Akaryakıt: '#1e3a8a',
-  Market: '#0f766e',
-};
 
 // ---- Date utilities ----
 

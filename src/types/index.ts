@@ -1,6 +1,22 @@
-export type StationName = 'Ümraniye' | 'Şile';
-export type DepartmentName = 'Akaryakıt' | 'Market';
-export type RoleName = 'Pompacı' | 'Vardiya Amiri' | 'Market Görevlisi' | 'Kasiyer';
+export type StationName = string;
+export type DepartmentName = string;
+
+export interface Station {
+  id: number;
+  name: string;
+}
+
+export interface Department {
+  id: number;
+  name: string;
+  color: string;
+}
+
+export interface Role {
+  id: number;
+  name: string;
+}
+export type RoleName = string;
 export type ShiftCodeKey = 'S' | 'Ö' | 'G' | 'İ' | 'Yİ' | 'Üİ' | 'İs' | '-';
 export type ShiftStatus = 'Planlandı' | 'Geldi' | 'Geç Kaldı' | 'Gelmedi';
 export type EmployeeStatus = 'Aktif' | 'Pasif';

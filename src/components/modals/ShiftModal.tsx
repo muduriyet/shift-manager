@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Shift, Employee, ShiftCodeKey, StationName, DepartmentName, RoleName, ShiftStatus } from '../../types';
-import { STATIONS, DEPARTMENTS, ROLES, STATUSES, SHIFT_TIMES, shiftById, TODAY_DATE_STR } from '../../constants';
+import { STATUSES, SHIFT_TIMES, shiftById, TODAY_DATE_STR } from '../../constants';
 import { Dialog } from '../ui/Dialog';
 import { Button } from '../ui/Button';
 import { Field, Input, Textarea } from '../ui/Field';
@@ -34,22 +34,25 @@ function validate(form: ShiftFormData): FormErrors {
 interface ShiftModalProps {
   shift: Shift | null;
   employees: Employee[];
+  stationNames: string[];
+  deptNames: string[];
+  roleNames: string[];
   onClose: () => void;
   onSave: (form: ShiftFormData, id: number | null) => void;
 }
 
-export function ShiftModal({ shift, employees, onClose, onSave }: ShiftModalProps) {
+export function ShiftModal({ shift, employees, stationNames, deptNames, roleNames, onClose, onSave }: ShiftModalProps) {
   const editing = !!shift?.id;
   const emp0 = shift ? employees.find(e => e.id === shift.empId) : null;
 
   const [form, setForm] = useState<ShiftFormData>({
     empId:     shift?.empId     ?? (employees.find(e => e.status === 'Aktif')?.id ?? employees[0]?.id ?? 0),
-    station:   shift?.station   ?? emp0?.station ?? STATIONS[0],
-    dept:      shift?.dept      ?? emp0?.dept    ?? DEPARTMENTS[0],
+    station:   shift?.station   ?? emp0?.station ?? stationNames[0] ?? '',
+    dept:      shift?.dept      ?? emp0?.dept    ?? deptNames[0]    ?? '',
     shiftDate: shift?.shiftDate ?? TODAY_DATE_STR,
     start:     shift?.start     ?? '08:00',
     end:       shift?.end       ?? '16:00',
-    role:      shift?.role      ?? emp0?.role    ?? ROLES[0],
+    role:      shift?.role      ?? emp0?.role    ?? roleNames[0] ?? '',
     status:    shift?.status    ?? 'Planlandı',
     note:      shift?.note      ?? '',
   });
@@ -108,10 +111,10 @@ export function ShiftModal({ shift, employees, onClose, onSave }: ShiftModalProp
         </div>
 
         <Field label="İstasyon">
-          <Select value={form.station} onChange={v => set('station', v as StationName)} icon="pin" options={STATIONS} />
+          <Select value={form.station} onChange={v => set('station', v as StationName)} icon="pin" options={stationNames} />
         </Field>
         <Field label="Departman">
-          <Select value={form.dept} onChange={v => set('dept', v as DepartmentName)} icon="layers" options={DEPARTMENTS} />
+          <Select value={form.dept} onChange={v => set('dept', v as DepartmentName)} icon="layers" options={deptNames} />
         </Field>
 
         <div className="col-2">
@@ -162,7 +165,7 @@ export function ShiftModal({ shift, employees, onClose, onSave }: ShiftModalProp
         </Field>
 
         <Field label="Görev">
-          <Select value={form.role} onChange={v => set('role', v as RoleName)} options={ROLES} />
+          <Select value={form.role} onChange={v => set('role', v as RoleName)} options={roleNames} />
         </Field>
         <Field label="Durum">
           <Select value={form.status} onChange={v => set('status', v as ShiftStatus)} options={STATUSES} />

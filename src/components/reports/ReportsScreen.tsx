@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import type { Employee, Shift } from '../../types';
 import {
-  STATIONS, DEPARTMENTS, SHIFT_CODES, WORK_CODES,
+  SHIFT_CODES, WORK_CODES,
   TODAY_DATE, THIS_WEEK_START, addDays, dateToStr, MONTH_SHORT_NAMES,
 } from '../../constants';
 import { Button } from '../ui/Button';
@@ -72,9 +72,11 @@ function fmtDate(shiftDate: string): { key: string; date: string } {
 interface ReportsScreenProps {
   employees: Employee[];
   shifts: Shift[];
+  stationNames: string[];
+  deptNames: string[];
 }
 
-export function ReportsScreen({ employees, shifts }: ReportsScreenProps) {
+export function ReportsScreen({ employees, shifts, stationNames, deptNames }: ReportsScreenProps) {
   const [period,     setPeriod]     = useState<Period>('Bu Hafta');
   const [station,    setStation]    = useState('Tümü');
   const [dept,       setDept]       = useState('Tümü');
@@ -119,11 +121,11 @@ export function ReportsScreen({ employees, shifts }: ReportsScreenProps) {
   }, [overallRate, prevRate, period]);
 
   const deptRates = useMemo(
-    () => DEPARTMENTS.map(d => ({
+    () => deptNames.map(d => ({
       dept: d,
       rate: calcRate(filtered.filter(s => s.dept === d)),
     })),
-    [filtered],
+    [filtered, deptNames],
   );
 
   const deptVal = deptRates.map(d => d.rate !== null ? `%${d.rate}` : '—').join(' / ');
@@ -170,7 +172,7 @@ export function ReportsScreen({ employees, shifts }: ReportsScreenProps) {
     {
       icon: 'layers', tone: 'came',
       title: 'Departman Bazlı Devam',
-      desc:  `${DEPARTMENTS.join(' / ')} devam oranı.`,
+      desc:  `${deptNames.join(' / ')} devam oranı.`,
       val:   deptVal,
       sub:   '',
     },
@@ -216,13 +218,13 @@ export function ReportsScreen({ employees, shifts }: ReportsScreenProps) {
           value={station}
           onChange={v => setStation(String(v))}
           icon="pin"
-          options={['Tümü', ...STATIONS].map(s => ({ value: s, label: s === 'Tümü' ? 'Tüm İstasyonlar' : s }))}
+          options={['Tümü', ...stationNames].map(s => ({ value: s, label: s === 'Tümü' ? 'Tüm İstasyonlar' : s }))}
         />
         <Select
           value={dept}
           onChange={v => setDept(String(v))}
           icon="layers"
-          options={['Tümü', ...DEPARTMENTS].map(s => ({ value: s, label: s === 'Tümü' ? 'Tüm Departmanlar' : s }))}
+          options={['Tümü', ...deptNames].map(s => ({ value: s, label: s === 'Tümü' ? 'Tüm Departmanlar' : s }))}
         />
       </div>
 

@@ -5,8 +5,6 @@ import { Badge } from '../ui/Badge';
 import { Icon } from '../ui/Icon';
 import { EmptyState } from '../ui/EmptyState';
 
-const GROUP_COLORS: Record<string, string> = { Akaryakıt: '#1e3a8a', Market: '#0f766e' };
-
 function shiftsFor(shifts: Shift[], empId: number, dateStr: string) {
   return shifts.filter(s => s.empId === empId && s.shiftDate === dateStr);
 }
@@ -138,7 +136,7 @@ function TableGroup({ group, shifts, weekDays, todayIndex, onShiftClick }: Table
       <tr className="group-row">
         <td colSpan={8}>
           <div className="group-head">
-            <span className="group-chip" style={{ background: GROUP_COLORS[group.label.split(' / ')[1]] ?? '#64748b' }} />
+            <span className="group-chip" style={{ background: group.color || '#64748b' }} />
             <b>{group.label}</b>
             <span className="count">· {group.emps.length} personel</span>
           </div>

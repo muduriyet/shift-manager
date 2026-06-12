@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import type { Employee } from '../../types';
-import { STATIONS, DEPARTMENTS } from '../../constants';
 import { Avatar } from '../ui/Avatar';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -10,12 +9,14 @@ import { EmptyState } from '../ui/EmptyState';
 
 interface EmployeesScreenProps {
   employees: Employee[];
+  stationNames: string[];
+  deptNames: string[];
   onEdit: (e: Employee) => void;
   onAdd: () => void;
   onDelete: (id: number) => void;
 }
 
-export function EmployeesScreen({ employees, onEdit, onAdd, onDelete }: EmployeesScreenProps) {
+export function EmployeesScreen({ employees, stationNames, deptNames, onEdit, onAdd, onDelete }: EmployeesScreenProps) {
   const [q, setQ] = useState('');
   const [station, setStation] = useState('Tümü');
   const [dept, setDept] = useState('Tümü');
@@ -55,13 +56,13 @@ export function EmployeesScreen({ employees, onEdit, onAdd, onDelete }: Employee
               value={station}
               onChange={v => setStation(String(v))}
               icon="pin"
-              options={['Tümü', ...STATIONS].map(s => ({ value: s, label: s === 'Tümü' ? 'Tüm İstasyonlar' : s }))}
+              options={['Tümü', ...stationNames].map(s => ({ value: s, label: s === 'Tümü' ? 'Tüm İstasyonlar' : s }))}
             />
             <Select
               value={dept}
               onChange={v => setDept(String(v))}
               icon="layers"
-              options={['Tümü', ...DEPARTMENTS].map(s => ({ value: s, label: s === 'Tümü' ? 'Tüm Departmanlar' : s }))}
+              options={['Tümü', ...deptNames].map(s => ({ value: s, label: s === 'Tümü' ? 'Tüm Departmanlar' : s }))}
             />
           </div>
         </div>

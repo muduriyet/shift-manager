@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Shift, Employee, ShiftStatus } from '../../types';
-import { STATIONS, DEPARTMENTS, SHIFT_CODES, WORK_CODES, TODAY_DATE, addDays, dateToStr, MONTH_NAMES } from '../../constants';
+import { SHIFT_CODES, WORK_CODES, TODAY_DATE, addDays, dateToStr, MONTH_NAMES } from '../../constants';
 import { Stat } from '../ui/Stat';
 import { Badge } from '../ui/Badge';
 import { Avatar } from '../ui/Avatar';
@@ -19,6 +19,8 @@ const SHIFT_CODE_ORDER: Record<string, number> = { S: 0, Ö: 1, G: 2 };
 interface DailyScreenProps {
   shifts: Shift[];
   employees: Employee[];
+  stationNames: string[];
+  deptNames: string[];
   station: string;
   setStation: (s: string) => void;
   dept: string;
@@ -26,7 +28,7 @@ interface DailyScreenProps {
   setStatus: (shiftId: number, status: ShiftStatus) => void;
 }
 
-export function DailyScreen({ shifts, employees, station, setStation, dept, setDept, setStatus }: DailyScreenProps) {
+export function DailyScreen({ shifts, employees, stationNames, deptNames, station, setStation, dept, setDept, setStatus }: DailyScreenProps) {
   const [viewDate, setViewDate] = useState<Date>(() => addDays(TODAY_DATE, -1));
   const viewDateStr = dateToStr(viewDate);
 
@@ -88,13 +90,13 @@ export function DailyScreen({ shifts, employees, station, setStation, dept, setD
           value={station}
           onChange={v => setStation(String(v))}
           icon="pin"
-          options={['Tümü', ...STATIONS].map(s => ({ value: s, label: s === 'Tümü' ? 'Tüm İstasyonlar' : s }))}
+          options={['Tümü', ...stationNames].map(s => ({ value: s, label: s === 'Tümü' ? 'Tüm İstasyonlar' : s }))}
         />
         <Select
           value={dept}
           onChange={v => setDept(String(v))}
           icon="layers"
-          options={['Tümü', ...DEPARTMENTS].map(s => ({ value: s, label: s === 'Tümü' ? 'Tüm Departmanlar' : s }))}
+          options={['Tümü', ...deptNames].map(s => ({ value: s, label: s === 'Tümü' ? 'Tüm Departmanlar' : s }))}
         />
       </div>
 
