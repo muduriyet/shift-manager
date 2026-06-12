@@ -400,9 +400,9 @@ table.month { border-collapse: separate; border-spacing: 0; min-width: 100%; use
 
 /* ---- reports ---- */
 .report-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-.report-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px; box-shadow: var(--shadow-sm); display:flex; flex-direction: column; gap: 14px; transition: box-shadow .12s, border-color .12s; cursor: pointer; }
-.report-card:hover { box-shadow: var(--shadow-md); border-color: var(--border-strong); }
-.report-card-action:hover { border-color: var(--absent-bd); box-shadow: 0 4px 16px -4px rgba(185,28,28,.12); }
+.report-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px; box-shadow: var(--shadow-sm); display:flex; flex-direction: column; gap: 14px; transition: box-shadow .12s, border-color .12s; }
+.report-card-action { cursor: pointer; }
+.report-card-action:hover { box-shadow: var(--shadow-md); border-color: var(--absent-bd); box-shadow: 0 4px 16px -4px rgba(185,28,28,.12); }
 .rc-drill { display: inline-flex; align-items: center; color: var(--muted-foreground); margin-left: 4px; }
 .report-card .rc-ico { width: 40px; height: 40px; border-radius: 10px; display:grid; place-items:center; }
 .report-card h3 { margin: 0; font-size: 15px; font-weight: 650; }
