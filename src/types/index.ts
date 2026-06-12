@@ -32,7 +32,6 @@ export interface Employee {
   dept: DepartmentName;
   role: RoleName;
   status: EmployeeStatus;
-  defaultShift: ShiftCodeKey;
   startDate: string | null;
   endDate: string | null;
 }
