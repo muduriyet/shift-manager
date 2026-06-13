@@ -6,3 +6,4 @@ dist/
 
 .vercel
 tsconfig.tsbuildinfo
+.codex/config.toml
