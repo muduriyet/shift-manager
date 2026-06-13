@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { ShiftCodeKey, MonthGroup, Employee } from '../../types';
-import { SHIFT_CODES, ALL_CODES } from '../../constants';
+import { SHIFT_CODES, ALL_CODES, isWithinEmployment } from '../../constants';
 import type { MonthDay } from '../../types';
 import { Icon } from '../ui/Icon';
 
@@ -404,9 +404,7 @@ function GroupRows({ group, orderedEmps, drag, codesOf, rowOf, isSel, startSel, 
               const sc = SHIFT_CODES[code] ?? SHIFT_CODES['-'];
               const d = monthDays[idx];
               const dateStr = `${activeMonth}-${String(idx + 1).padStart(2, '0')}`;
-              const blocked =
-                (!!emp.startDate && dateStr < emp.startDate) ||
-                (!!emp.endDate   && dateStr > emp.endDate);
+              const blocked = !isWithinEmployment(emp.startDate, emp.endDate, dateStr);
               return (
                 <td
                   key={idx}

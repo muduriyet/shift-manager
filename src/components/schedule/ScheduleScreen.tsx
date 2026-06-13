@@ -4,6 +4,7 @@ import {
   MONTH_NAMES, MONTH_SHORT_NAMES,
   TODAY_DATE, TODAY_DATE_STR, WORK_CODES,
   getMonday, addDays, buildWeekDays, buildMonthDays, getMonthLabel,
+  isWithinEmployment,
 } from '../../constants';
 import { Stat } from '../ui/Stat';
 import { Button } from '../ui/Button';
@@ -55,13 +56,14 @@ interface ScheduleScreenProps {
   setCode: (id: number, idx: number, code: ShiftCodeKey) => void;
   onNewShift: () => void;
   onShiftClick: (s: Shift) => void;
+  onCellAdd: (empId: number, dateStr: string) => void;
 }
 
 export function ScheduleScreen({
   shifts, employees, stationNames, deptNames, deptColors,
   station, setStation, dept, setDept,
   mode, setMode, activeMonth, setActiveMonth,
-  codesOf, setCode, onNewShift, onShiftClick,
+  codesOf, setCode, onNewShift, onShiftClick, onCellAdd,
 }: ScheduleScreenProps) {
   // ---- Week navigation ----
   const [weekStart, setWeekStart] = useState<Date>(() => getMonday(TODAY_DATE));
@@ -92,8 +94,14 @@ export function ScheduleScreen({
     (station === 'Tümü' || e.station === station) && (dept === 'Tümü' || e.dept === dept)
   );
   const filteredIds = new Set(filtered.map(e => e.id));
-  const filteredShifts = shifts.filter(s => filteredIds.has(s.empId));
   const employeeMap = new Map(employees.map(e => [e.id, e]));
+  // İstihdam penceresi dışındaki (giriş öncesi / çıkış sonrası) vardiyalar
+  // kayıtta korunur ama çizelge ve istatistiklerde gösterilmez.
+  const filteredShifts = shifts.filter(s => {
+    if (!filteredIds.has(s.empId)) return false;
+    const emp = employeeMap.get(s.empId);
+    return emp ? isWithinEmployment(emp.startDate, emp.endDate, s.shiftDate) : true;
+  });
 
   // Stats use today's work shifts only (S, Ö, G)
   const todayShifts = filteredShifts.filter(s => s.shiftDate === TODAY_DATE_STR && (WORK_CODES as readonly string[]).includes(s.code));
@@ -207,6 +215,7 @@ export function ScheduleScreen({
           todayIndex={todayIndex}
           onShiftClick={onShiftClick}
           onNewShift={onNewShift}
+          onAddShift={onCellAdd}
         />
       )}
     </div>

@@ -265,7 +265,15 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
 .shift.coded { border-left-width: 4px; }
 .shift .shift-name { font-size: 13px; font-weight: 700; letter-spacing: -.01em; }
 .shift-foot { margin-top: 7px; display:flex; align-items:center; justify-content: space-between; gap:6px; }
-.day-off { font-size: 12px; color: var(--subtle-foreground); padding: 14px 4px; text-align: center; font-style: italic; }
+.day-off { font-size: 13px; color: var(--subtle-foreground); padding: 14px 4px; text-align: center; }
+.day-add { width: 100%; border: none; background: none; cursor: pointer; padding: 13px 4px; border-radius: 6px; color: var(--subtle-foreground); font-size: 13px; transition: background .12s, color .12s; }
+.day-add:hover { background: var(--primary-soft); color: var(--primary); }
+.day-add .add-ico { display: none; align-items: center; justify-content: center; gap: 4px; font-weight: 600; }
+.day-add:hover .dash { display: none; }
+.day-add:hover .add-ico { display: inline-flex; }
+.day-cell.is-outside { background: repeating-linear-gradient(-45deg, transparent 0 5px, rgba(120,120,120,.05) 5px 7px); }
+.day-cell.is-outside.is-past { background: repeating-linear-gradient(-45deg, transparent 0 5px, rgba(120,120,120,.08) 5px 7px); }
+.day-outside { font-size: 13px; color: var(--subtle-foreground); padding: 14px 4px; text-align: center; cursor: default; }
 
 /* ---- shift codes ---- */
 :root {

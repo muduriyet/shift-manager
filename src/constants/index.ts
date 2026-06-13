@@ -30,6 +30,18 @@ export function shiftById(id: ShiftCodeKey): ShiftTime {
   return SHIFT_TIMES.find(s => s.id === id) ?? SHIFT_TIMES[0];
 }
 
+// İstihdam penceresi: verilen tarih personelin giriş/çıkış aralığında mı?
+// Tüm görünümler (aylık/haftalık/günlük/rapor) ve atama kuralı bunu tek kaynak olarak kullanır.
+export function isWithinEmployment(
+  startDate: string | null,
+  endDate: string | null,
+  dateStr: string,
+): boolean {
+  if (startDate && dateStr < startDate) return false;
+  if (endDate   && dateStr > endDate)   return false;
+  return true;
+}
+
 
 // ---- Date utilities ----
 

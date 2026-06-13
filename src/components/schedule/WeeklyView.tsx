@@ -1,5 +1,5 @@
 import type { Shift, Employee, MonthGroup, WeekDay } from '../../types';
-import { SHIFT_CODES, WORK_CODES } from '../../constants';
+import { SHIFT_CODES, WORK_CODES, MONTH_SHORT_NAMES, isWithinEmployment } from '../../constants';
 import { Avatar } from '../ui/Avatar';
 import { Badge } from '../ui/Badge';
 import { Icon } from '../ui/Icon';
@@ -7,6 +7,18 @@ import { EmptyState } from '../ui/EmptyState';
 
 function shiftsFor(shifts: Shift[], empId: number, dateStr: string) {
   return shifts.filter(s => s.empId === empId && s.shiftDate === dateStr);
+}
+
+function fmtShort(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  return `${d} ${MONTH_SHORT_NAMES[m - 1]} ${y}`;
+}
+
+// İstihdam penceresi dışındaki hücre için tooltip metni (neden boş?).
+function outsideReason(emp: Employee, dateStr: string): string {
+  if (emp.startDate && dateStr < emp.startDate) return `${emp.name} · işe giriş ${fmtShort(emp.startDate)}`;
+  if (emp.endDate   && dateStr > emp.endDate)   return `${emp.name} · işten çıkış ${fmtShort(emp.endDate)}`;
+  return '';
 }
 
 interface WeeklyViewProps {
@@ -17,9 +29,10 @@ interface WeeklyViewProps {
   todayIndex: number;   // -1 if today is not in this week
   onShiftClick: (s: Shift) => void;
   onNewShift: () => void;
+  onAddShift: (empId: number, dateStr: string) => void;
 }
 
-export function WeeklyView({ groups, shifts, employeeMap, weekDays, todayIndex, onShiftClick, onNewShift }: WeeklyViewProps) {
+export function WeeklyView({ groups, shifts, employeeMap, weekDays, todayIndex, onShiftClick, onNewShift, onAddShift }: WeeklyViewProps) {
   const codeOrder: Record<string, number> = { S: 0, Ö: 1, G: 2 };
 
   const sortedGroups = groups.map(g => ({
@@ -72,6 +85,7 @@ export function WeeklyView({ groups, shifts, employeeMap, weekDays, todayIndex, 
               weekDays={weekDays}
               todayIndex={todayIndex}
               onShiftClick={onShiftClick}
+              onAddShift={onAddShift}
             />
           ))}
         </tbody>
@@ -128,9 +142,10 @@ interface TableGroupProps {
   weekDays: WeekDay[];
   todayIndex: number;
   onShiftClick: (s: Shift) => void;
+  onAddShift: (empId: number, dateStr: string) => void;
 }
 
-function TableGroup({ group, shifts, weekDays, todayIndex, onShiftClick }: TableGroupProps) {
+function TableGroup({ group, shifts, weekDays, todayIndex, onShiftClick, onAddShift }: TableGroupProps) {
   return (
     <>
       <tr className="group-row">
@@ -160,12 +175,18 @@ function TableGroup({ group, shifts, weekDays, todayIndex, onShiftClick }: Table
             const cellShifts = shiftsFor(shifts, emp.id, d.dateStr);
             const isToday = di === todayIndex;
             const isPast  = todayIndex >= 0 && di < todayIndex;
-            const cls = `day-cell${isToday ? ' is-today' : isPast ? ' is-past' : ''}`;
+            const outside = !isWithinEmployment(emp.startDate, emp.endDate, d.dateStr);
+            const cls = `day-cell${isToday ? ' is-today' : isPast ? ' is-past' : ''}${outside ? ' is-outside' : ''}`;
             return (
               <td key={di} className={cls}>
-                {cellShifts.length === 0
-                  ? <div className="day-off">İzin</div>
-                  : cellShifts.map(s => (
+                {outside
+                  ? <div className="day-outside" title={outsideReason(emp, d.dateStr)}>—</div>
+                  : cellShifts.length === 0
+                    ? <button className="day-add" onClick={() => onAddShift(emp.id, d.dateStr)} title="Vardiya ekle">
+                        <span className="dash">—</span>
+                        <span className="add-ico"><Icon name="plus" size={13} /> Ekle</span>
+                      </button>
+                    : cellShifts.map(s => (
                       <div
                         key={s.id}
                         className={`shift coded ${SHIFT_CODES[s.code]?.cls ?? ''}`}

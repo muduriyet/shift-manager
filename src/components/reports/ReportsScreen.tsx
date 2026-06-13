@@ -4,6 +4,7 @@ import type { Employee, Shift } from '../../types';
 import {
   SHIFT_CODES, WORK_CODES,
   TODAY_DATE, THIS_WEEK_START, addDays, dateToStr, MONTH_SHORT_NAMES,
+  isWithinEmployment,
 } from '../../constants';
 import { Button } from '../ui/Button';
 import { Select } from '../ui/Select';
@@ -85,9 +86,19 @@ export function ReportsScreen({ employees, shifts, stationNames, deptNames }: Re
   const range = useMemo(() => periodRange(period),     [period]);
   const prev  = useMemo(() => prevPeriodRange(period), [period]);
 
+  // İstihdam penceresi dışındaki vardiyalar rapora dahil edilmez (geçmiş kayıtta korunur).
+  const empById = useMemo(() => new Map(employees.map(e => [e.id, e])), [employees]);
+  const employed = useMemo(
+    () => shifts.filter(s => {
+      const emp = empById.get(s.empId);
+      return emp ? isWithinEmployment(emp.startDate, emp.endDate, s.shiftDate) : true;
+    }),
+    [shifts, empById],
+  );
+
   const inRange = useMemo(
-    () => shifts.filter(s => s.shiftDate >= range.start && s.shiftDate <= range.end),
-    [shifts, range],
+    () => employed.filter(s => s.shiftDate >= range.start && s.shiftDate <= range.end),
+    [employed, range],
   );
 
   const filtered = useMemo(
@@ -100,13 +111,13 @@ export function ReportsScreen({ employees, shifts, stationNames, deptNames }: Re
 
   const inPrev = useMemo(
     () => prev
-      ? shifts.filter(s =>
+      ? employed.filter(s =>
           s.shiftDate >= prev.start && s.shiftDate <= prev.end &&
           (station === 'Tümü' || s.station === station) &&
           (dept    === 'Tümü' || s.dept    === dept),
         )
       : [],
-    [shifts, prev, station, dept],
+    [employed, prev, station, dept],
   );
 
   const overallRate = useMemo(() => calcRate(filtered), [filtered]);

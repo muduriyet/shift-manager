@@ -13,28 +13,31 @@ interface EmployeesScreenProps {
   deptNames: string[];
   onEdit: (e: Employee) => void;
   onAdd: () => void;
-  onDelete: (id: number) => void;
+  onSetActive: (id: number, active: boolean) => void;
 }
 
-export function EmployeesScreen({ employees, stationNames, deptNames, onEdit, onAdd, onDelete }: EmployeesScreenProps) {
+export function EmployeesScreen({ employees, stationNames, deptNames, onEdit, onAdd, onSetActive }: EmployeesScreenProps) {
   const [q, setQ] = useState('');
   const [station, setStation] = useState('Tümü');
   const [dept, setDept] = useState('Tümü');
+  const [status, setStatus] = useState<'Tümü' | 'Aktif' | 'Pasif'>('Aktif');
   const [confirmId, setConfirmId] = useState<number | null>(null);
 
   const confirmEmp = confirmId != null ? employees.find(e => e.id === confirmId) : null;
 
-  function handleDeleteClick(id: number) { setConfirmId(id); }
-  function handleConfirm() { if (confirmId != null) { onDelete(confirmId); setConfirmId(null); } }
+  function handleDeactivateClick(id: number) { setConfirmId(id); }
+  function handleConfirm() { if (confirmId != null) { onSetActive(confirmId, false); setConfirmId(null); } }
   function handleCancel() { setConfirmId(null); }
 
   const rows = employees.filter(e =>
+    (status === 'Tümü' || e.status === status) &&
     (station === 'Tümü' || e.station === station) &&
     (dept === 'Tümü' || e.dept === dept) &&
     (q === '' || e.name.toLocaleLowerCase('tr').includes(q.toLocaleLowerCase('tr')))
   );
 
-  const hasFilters = q !== '' || station !== 'Tümü' || dept !== 'Tümü';
+  // Hiç personel yoksa "ilk personeli ekle"; varsa ama filtre elediyse "sonuç yok" göster.
+  const hasEmployees = employees.length > 0;
 
   return (
     <div>
@@ -53,6 +56,16 @@ export function EmployeesScreen({ employees, stationNames, deptNames, onEdit, on
           <SearchInput value={q} onChange={setQ} placeholder="Personel ara..." />
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginLeft: 'auto' }}>
             <Select
+              value={status}
+              onChange={v => setStatus(v as 'Tümü' | 'Aktif' | 'Pasif')}
+              icon="filter"
+              options={[
+                { value: 'Aktif', label: 'Aktif Personel' },
+                { value: 'Pasif', label: 'Pasif Personel' },
+                { value: 'Tümü',  label: 'Tüm Durumlar' },
+              ]}
+            />
+            <Select
               value={station}
               onChange={v => setStation(String(v))}
               icon="pin"
@@ -69,14 +82,14 @@ export function EmployeesScreen({ employees, stationNames, deptNames, onEdit, on
 
         {rows.length === 0 ? (
           <EmptyState
-            icon={hasFilters ? 'search' : 'users'}
-            title={hasFilters ? 'Sonuç bulunamadı' : 'Henüz personel eklenmedi'}
+            icon={hasEmployees ? 'search' : 'users'}
+            title={hasEmployees ? 'Sonuç bulunamadı' : 'Henüz personel eklenmedi'}
             description={
-              hasFilters
-                ? 'Arama kriterlerinizi değiştirerek tekrar deneyin.'
+              hasEmployees
+                ? 'Arama veya filtre kriterlerinizi değiştirerek tekrar deneyin.'
                 : 'İlk personeli eklemek için "Yeni Personel Ekle" butonuna tıklayın.'
             }
-            action={!hasFilters ? { label: 'Personel Ekle', icon: 'plus', onClick: onAdd } : undefined}
+            action={!hasEmployees ? { label: 'Personel Ekle', icon: 'plus', onClick: onAdd } : undefined}
           />
         ) : (
           <>
@@ -112,7 +125,11 @@ export function EmployeesScreen({ employees, stationNames, deptNames, onEdit, on
                       <td>
                         <div className="row-actions">
                           <Button variant="ghost" size="sm" icon="pencil" onClick={() => onEdit(e)} title="Düzenle" />
-                          <Button variant="danger-ghost" size="sm" icon="trash" onClick={() => handleDeleteClick(e.id)} title="Sil" />
+                          {e.status === 'Aktif' ? (
+                            <Button variant="ghost" size="sm" icon="userX" onClick={() => handleDeactivateClick(e.id)} title="Pasife Al" />
+                          ) : (
+                            <Button variant="ghost" size="sm" icon="userCheck" onClick={() => onSetActive(e.id, true)} title="Aktif Et" />
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -149,7 +166,11 @@ export function EmployeesScreen({ employees, stationNames, deptNames, onEdit, on
                   </div>
                   <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
                     <Button variant="outline" size="sm" icon="pencil" onClick={() => onEdit(e)} style={{ flex: 1 }}>Düzenle</Button>
-                    <Button variant="danger-ghost" size="sm" icon="trash" onClick={() => handleDeleteClick(e.id)} />
+                    {e.status === 'Aktif' ? (
+                      <Button variant="ghost" size="sm" icon="userX" onClick={() => handleDeactivateClick(e.id)} title="Pasife Al" />
+                    ) : (
+                      <Button variant="ghost" size="sm" icon="userCheck" onClick={() => onSetActive(e.id, true)} title="Aktif Et" />
+                    )}
                   </div>
                 </div>
               ))}
@@ -162,12 +183,12 @@ export function EmployeesScreen({ employees, stationNames, deptNames, onEdit, on
         <div className="overlay" onClick={handleCancel}>
           <div className="dialog" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
             <div className="dialog-head">
-              <h2>Personeli Sil</h2>
-              <p><b>{confirmEmp.name}</b> adlı personel kalıcı olarak silinecek. Bu işlem geri alınamaz.</p>
+              <h2>Personeli Pasife Al</h2>
+              <p><b>{confirmEmp.name}</b> pasife alınacak. Geçmiş vardiyaları korunur ve istediğin zaman tekrar aktif edebilirsin.</p>
             </div>
             <div className="dialog-foot">
               <Button variant="outline" onClick={handleCancel}>İptal</Button>
-              <Button variant="danger-ghost" icon="trash" onClick={handleConfirm}>Sil</Button>
+              <Button variant="primary" icon="userX" onClick={handleConfirm}>Pasife Al</Button>
             </div>
           </div>
         </div>

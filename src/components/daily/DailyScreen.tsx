@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Shift, Employee, ShiftStatus } from '../../types';
-import { SHIFT_CODES, WORK_CODES, TODAY_DATE, addDays, dateToStr, MONTH_NAMES } from '../../constants';
+import { SHIFT_CODES, WORK_CODES, TODAY_DATE, addDays, dateToStr, MONTH_NAMES, isWithinEmployment } from '../../constants';
 import { Stat } from '../ui/Stat';
 import { Badge } from '../ui/Badge';
 import { Avatar } from '../ui/Avatar';
@@ -47,7 +47,12 @@ export function DailyScreen({ shifts, employees, stationNames, deptNames, statio
   );
 
   const rows = shifts
-    .filter(s => s.shiftDate === viewDateStr && allowedIds.has(s.empId) && (WORK_CODES as readonly string[]).includes(s.code))
+    .filter(s => {
+      if (s.shiftDate !== viewDateStr || !allowedIds.has(s.empId)) return false;
+      if (!(WORK_CODES as readonly string[]).includes(s.code)) return false;
+      const emp = empMap.get(s.empId);
+      return emp ? isWithinEmployment(emp.startDate, emp.endDate, s.shiftDate) : true;
+    })
     .sort((a, b) => (SHIFT_CODE_ORDER[a.code] ?? 9) - (SHIFT_CODE_ORDER[b.code] ?? 9) || a.start.localeCompare(b.start));
 
   const counts = {

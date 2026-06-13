@@ -188,9 +188,17 @@ export async function updateEmployee(
   return toEmployee(data as unknown as EmpRow);
 }
 
-export async function deleteEmployee(id: number): Promise<void> {
-  const { error } = await supabase.from('employees').delete().eq('id', id);
+// Soft delete: personeli fiziksel silmek yerine is_active'i değiştirir. Böylece
+// shifts.emp_id cascade'i hiç tetiklenmez ve geçmiş vardiya kaydı korunur.
+export async function setEmployeeActive(id: number, active: boolean): Promise<Employee> {
+  const { data, error } = await supabase
+    .from('employees')
+    .update({ is_active: active })
+    .eq('id', id)
+    .select(EMP_SELECT)
+    .single();
   if (error) throw error;
+  return toEmployee(data as unknown as EmpRow);
 }
 
 

@@ -1,9 +1,9 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { ViewId, ScheduleMode, Employee, Shift, ShiftStatus, ShiftCodeKey, StationName, DepartmentName, RoleName, Station, Department, Role } from './types';
-import { SHIFT_CODES, WORK_CODES } from './constants';
+import { SHIFT_CODES, WORK_CODES, isWithinEmployment } from './constants';
 import {
   fetchEmployees, fetchShifts,
-  createEmployee, updateEmployee, deleteEmployee,
+  createEmployee, updateEmployee, setEmployeeActive,
   createShift, updateShift, updateShiftStatus, deleteShift,
   fetchStations, createStation, deleteStation,
   fetchDepartments, createDepartment, deleteDepartment,
@@ -174,8 +174,7 @@ export default function App() {
 
     const existing = shifts.find(s => s.empId === id && s.shiftDate === dateStr);
 
-    if (emp.startDate && dateStr < emp.startDate) return;
-    if (emp.endDate   && dateStr > emp.endDate)   return;
+    if (!isWithinEmployment(emp.startDate, emp.endDate, dateStr)) return;
 
     const isWork = (WORK_CODES as readonly string[]).includes(code);
 
@@ -265,20 +264,9 @@ export default function App() {
           s.empId === id ? { ...s, role: form.role, station: form.station, dept: form.dept } : s
         ));
 
-        // Tarih aralığı dışına düşen vardiyaları sil
-        const outOfRange = shifts.filter(s => {
-          if (s.empId !== id) return false;
-          if (form.startDate && s.shiftDate < form.startDate) return true;
-          if (form.endDate   && s.shiftDate > form.endDate)   return true;
-          return false;
-        });
-        if (outOfRange.length > 0) {
-          await Promise.all(outOfRange.map(s => deleteShift(s.id)));
-          const removedIds = new Set(outOfRange.map(s => s.id));
-          setShifts(prev => prev.filter(s => !removedIds.has(s.id)));
-        }
-
-        toast(form.name + ' güncellendi' + (outOfRange.length > 0 ? ` · ${outOfRange.length} vardiya silindi` : ''));
+        // Giriş/çıkış aralığı dışındaki vardiyalar SİLİNMEZ; DB'de korunur ve
+        // tüm görünümlerde istihdam penceresine göre gizlenir (isWithinEmployment).
+        toast(form.name + ' güncellendi');
       } else {
         const newEmp = await createEmployee(payload);
         setEmployees(prev => [...prev, newEmp]);
@@ -291,15 +279,15 @@ export default function App() {
     }
   }
 
-  async function handleDeleteEmployee(id: number) {
+  async function handleSetEmployeeActive(id: number, active: boolean) {
     const emp = employees.find(e => e.id === id);
     try {
-      await deleteEmployee(id);
-      setEmployees(prev => prev.filter(e => e.id !== id));
-      setShifts(prev => prev.filter(s => s.empId !== id));
-      toast((emp?.name ?? 'Personel') + ' silindi');
+      const updated = await setEmployeeActive(id, active);
+      // Soft delete: personel listede kalır, vardiya geçmişi (shifts) korunur.
+      setEmployees(prev => prev.map(e => e.id === id ? updated : e));
+      toast((emp?.name ?? 'Personel') + (active ? ' tekrar aktif edildi' : ' pasife alındı'));
     } catch {
-      toast('Silme işlemi başarısız');
+      toast(active ? 'Aktifleştirme başarısız' : 'Pasife alma başarısız');
     }
   }
 
@@ -340,6 +328,18 @@ export default function App() {
           codesOf={codesOf} setCode={setCode}
           onNewShift={() => { setShiftToEdit(null); setShiftModalOpen(true); }}
           onShiftClick={s => { setShiftToEdit(s); setShiftModalOpen(true); }}
+          onCellAdd={(empId, shiftDate) => {
+            const emp = employees.find(e => e.id === empId);
+            if (!emp) return;
+            // Seed (id:0) → modal "Yeni Vardiya Ekle" modunda ama personel + tarih dolu açılır.
+            setShiftToEdit({
+              id: 0, empId, shiftDate, dayIndex: 0, code: '-',
+              start: '08:00', end: '16:00',
+              role: emp.role, station: emp.station, dept: emp.dept,
+              status: 'Planlandı', note: '',
+            });
+            setShiftModalOpen(true);
+          }}
         />
       );
       break;
@@ -351,7 +351,7 @@ export default function App() {
           deptNames={deptNames}
           onEdit={e => { setEmpToEdit(e); setEmpModalOpen(true); }}
           onAdd={() => { setEmpToEdit(null); setEmpModalOpen(true); }}
-          onDelete={handleDeleteEmployee}
+          onSetActive={handleSetEmployeeActive}
         />
       );
       break;
