@@ -1,9 +1,11 @@
-import { supabase } from './supabase';
+import { getSupabaseClient } from './supabase';
 import type {
   Employee, Shift, ShiftCodeKey,
   StationName, DepartmentName, RoleName, ShiftStatus, EmployeeStatus,
   Station, Department, Role,
 } from '../types';
+
+const supabase = () => getSupabaseClient();
 
 // ---- Stations & Departments ----
 
@@ -14,36 +16,36 @@ function toStation(r: StationRow): Station       { return { id: r.id, name: r.na
 function toDepartment(r: DepartmentRow): Department { return { id: r.id, name: r.name, color: r.color }; }
 
 export async function fetchStations(): Promise<Station[]> {
-  const { data, error } = await supabase.from('stations').select('*').order('id');
+  const { data, error } = await supabase().from('stations').select('*').order('id');
   if (error) throw error;
   return (data as StationRow[]).map(toStation);
 }
 
 export async function createStation(name: string): Promise<Station> {
-  const { data, error } = await supabase.from('stations').insert({ name }).select().single();
+  const { data, error } = await supabase().from('stations').insert({ name }).select().single();
   if (error) throw error;
   return toStation(data as StationRow);
 }
 
 export async function deleteStation(id: number): Promise<void> {
-  const { error } = await supabase.from('stations').delete().eq('id', id);
+  const { error } = await supabase().from('stations').delete().eq('id', id);
   if (error) throw error;
 }
 
 export async function fetchDepartments(): Promise<Department[]> {
-  const { data, error } = await supabase.from('departments').select('*').order('id');
+  const { data, error } = await supabase().from('departments').select('*').order('id');
   if (error) throw error;
   return (data as DepartmentRow[]).map(toDepartment);
 }
 
 export async function createDepartment(name: string, color: string): Promise<Department> {
-  const { data, error } = await supabase.from('departments').insert({ name, color }).select().single();
+  const { data, error } = await supabase().from('departments').insert({ name, color }).select().single();
   if (error) throw error;
   return toDepartment(data as DepartmentRow);
 }
 
 export async function deleteDepartment(id: number): Promise<void> {
-  const { error } = await supabase.from('departments').delete().eq('id', id);
+  const { error } = await supabase().from('departments').delete().eq('id', id);
   if (error) throw error;
 }
 
@@ -52,19 +54,19 @@ interface RoleRow { id: number; name: string; }
 function toRole(r: RoleRow): Role { return { id: r.id, name: r.name }; }
 
 export async function fetchRoles(): Promise<Role[]> {
-  const { data, error } = await supabase.from('roles').select('*').order('id');
+  const { data, error } = await supabase().from('roles').select('*').order('id');
   if (error) throw error;
   return (data as RoleRow[]).map(toRole);
 }
 
 export async function createRole(name: string): Promise<Role> {
-  const { data, error } = await supabase.from('roles').insert({ name }).select().single();
+  const { data, error } = await supabase().from('roles').insert({ name }).select().single();
   if (error) throw error;
   return toRole(data as RoleRow);
 }
 
 export async function deleteRole(id: number): Promise<void> {
-  const { error } = await supabase.from('roles').delete().eq('id', id);
+  const { error } = await supabase().from('roles').delete().eq('id', id);
   if (error) throw error;
 }
 
@@ -143,7 +145,7 @@ function toShift(r: ShiftRow): Shift {
 // ---- Employees ----
 
 export async function fetchEmployees(): Promise<Employee[]> {
-  const { data, error } = await supabase.from('employees').select(EMP_SELECT).order('id');
+  const { data, error } = await supabase().from('employees').select(EMP_SELECT).order('id');
   if (error) throw error;
   return (data as unknown as EmpRow[]).map(toEmployee);
 }
@@ -157,7 +159,7 @@ export async function createEmployee(form: {
   startDate: string | null;
   endDate: string | null;
 }): Promise<Employee> {
-  const { data, error } = await supabase
+  const { data, error } = await supabase()
     .from('employees')
     .insert({
       name: form.name,
@@ -178,7 +180,7 @@ export async function updateEmployee(
   id: number,
   form: { name: string; stationId: number; deptId: number; roleId: number; status: EmployeeStatus; startDate: string | null; endDate: string | null },
 ): Promise<Employee> {
-  const { data, error } = await supabase
+  const { data, error } = await supabase()
     .from('employees')
     .update({ name: form.name, station_id: form.stationId, dept_id: form.deptId, role_id: form.roleId, is_active: form.status === 'Aktif', start_date: form.startDate || null, end_date: form.endDate || null })
     .eq('id', id)
@@ -191,7 +193,7 @@ export async function updateEmployee(
 // Soft delete: personeli fiziksel silmek yerine is_active'i değiştirir. Böylece
 // shifts.emp_id cascade'i hiç tetiklenmez ve geçmiş vardiya kaydı korunur.
 export async function setEmployeeActive(id: number, active: boolean): Promise<Employee> {
-  const { data, error } = await supabase
+  const { data, error } = await supabase()
     .from('employees')
     .update({ is_active: active })
     .eq('id', id)
@@ -205,7 +207,7 @@ export async function setEmployeeActive(id: number, active: boolean): Promise<Em
 // ---- Shifts ----
 
 export async function fetchShifts(): Promise<Shift[]> {
-  const { data, error } = await supabase.from('shifts').select('*').order('id');
+  const { data, error } = await supabase().from('shifts').select('*').order('id');
   if (error) throw error;
   return (data as ShiftRow[]).map(toShift);
 }
@@ -223,7 +225,7 @@ export async function createShift(form: {
   code?: ShiftCodeKey;
 }): Promise<Shift> {
   const dayIndex = (new Date(form.shiftDate + 'T00:00:00').getDay() + 6) % 7;
-  const { data, error } = await supabase
+  const { data, error } = await supabase()
     .from('shifts')
     .insert({
       emp_id: form.empId,
@@ -268,19 +270,18 @@ export async function updateShift(
   if (form.note   !== undefined) patch.note       = form.note;
   if (form.code   !== undefined) patch.code       = form.code;
 
-  const { data, error } = await supabase
+  const { data, error } = await supabase()
     .from('shifts').update(patch).eq('id', id).select().single();
   if (error) throw error;
   return toShift(data as ShiftRow);
 }
 
 export async function updateShiftStatus(id: number, status: ShiftStatus): Promise<void> {
-  const { error } = await supabase.from('shifts').update({ status }).eq('id', id);
+  const { error } = await supabase().from('shifts').update({ status }).eq('id', id);
   if (error) throw error;
 }
 
 export async function deleteShift(id: number): Promise<void> {
-  const { error } = await supabase.from('shifts').delete().eq('id', id);
+  const { error } = await supabase().from('shifts').delete().eq('id', id);
   if (error) throw error;
 }
-

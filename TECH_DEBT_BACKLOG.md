@@ -20,9 +20,7 @@ Bu dosya, mevcut proje durumu ve `TECH_DEBT_BACKLOG_CLAUDE.md` üzerinden yenide
 
 ## Aktif Backlog
 
-| ID | Öncelik | Başlık | Efor | Durum | Kaynak |
-| --- | --- | --- | --- | --- | --- |
-| TD-014 | P3 | Env validation ile bağlantı hatasını netleştir | S | Açık | C-11 |
+Aktif teknik borç maddesi kalmadı.
 
 ## Tamamlanan / Kapanan Maddeler
 
@@ -34,6 +32,7 @@ Bu dosya, mevcut proje durumu ve `TECH_DEBT_BACKLOG_CLAUDE.md` üzerinden yenide
 | TD-004 | P3 | Vardiya modalında istihdam tarih aralığı validasyonu ekle | Tamamlandı | `ShiftModal` ve `handleSaveShift` `isWithinEmployment` kullanır |
 | TD-007 | P3 | `xlsx`'i dinamik import'a çevir | Tamamlandı | `src/lib/excel.ts` lazy import + export loading state |
 | TD-020 | P3 | localStorage navigation değerlerini doğrula | Tamamlandı | `isViewId` / `isScheduleMode` guard + invalid key cleanup |
+| TD-014 | P3 | Env validation ile bağlantı hatasını netleştir | Tamamlandı | Supabase env guard + kullanıcıya net hata mesajı |
 | TD-017 | P0 | Personel silmede vardiya geçmişini koru | Tamamlandı | `setEmployeeActive`, soft delete, `on delete restrict` |
 | TD-018 | P1 | Serbest saatli vardiyalar `-` koduna düşmesin | Tamamlandı | `Öz` kodu, `WORK_CODES`, `codeFromTimes` |
 | TD-015 | P1 | Shift status tutarlılığını sağla | Tamamlandı | `ShiftStatus = Planlandı/Geldi/Gelmedi`, DB check |
@@ -42,26 +41,11 @@ Bu dosya, mevcut proje durumu ve `TECH_DEBT_BACKLOG_CLAUDE.md` üzerinden yenide
 
 ## Detaylı Aktif İş Kalemleri
 
-### TD-014 - Env validation ile bağlantı hatasını netleştir
-
-Öncelik: P3
-Alan: DX / hata görünürlüğü
-Efor: S
-Durum: Açık
-
-`VITE_SUPABASE_URL` veya `VITE_SUPABASE_ANON_KEY` eksik/hatalı olduğunda kullanıcı sadece genel bağlantı hatası görüyor. Geliştirme sırasında hangi env değerinin eksik olduğu net değil.
-
-Önerilen çözüm:
-- Supabase client oluşturulmadan önce env değerlerini doğrula.
-- Eksik/hatalı değer için açık console mesajı ve mümkünse kullanıcıya net ekran mesajı göster.
-
-Kabul kriterleri:
-- Eksik env durumunda sorunlu değişken adı açıkça görülür.
-- Genel "Supabase'e ulaşılamıyor" mesajı daha tanılayıcı hale gelir.
+Aktif teknik borç maddesi kalmadı.
 
 ## Önerilen Uygulama Sırası
 
-1. TD-014 env validation
+Aktif teknik borç maddesi kalmadı. Yeni maddeler oluşursa bu bölüm yeniden sıralanacak.
 
 ## Ertelenenler
 
@@ -132,6 +116,14 @@ Durum: Tamamlandı
 - `vy_view` sadece bilinen `ViewId` değerlerinden biriyse state'e alınır.
 - `vy_mode` sadece `hafta` veya `ay` ise state'e alınır.
 - Geçersiz/eski localStorage değerleri silinir ve uygulama güvenli default olan `cizelge` / `ay` ile açılır.
+
+### TD-014 - Env validation ile bağlantı hatasını netleştir
+
+Durum: Tamamlandı
+
+- Supabase client oluşturulmadan önce `VITE_SUPABASE_URL` ve `VITE_SUPABASE_ANON_KEY` doğrulanır.
+- Eksik env değerlerinde console ve kullanıcı ekranı değişken adlarını açıkça gösterir.
+- Hatalı URL formatında Supabase client oluşturulmaz; uygulama genel beyaz ekran yerine tanılayıcı bağlantı hatası gösterir.
 
 ### TD-017 - Personel silmede vardiya geçmişini koru
 

@@ -9,6 +9,7 @@ import {
   fetchDepartments, createDepartment, deleteDepartment,
   fetchRoles, createRole, deleteRole,
 } from './lib/db';
+import { isSupabaseConfigError } from './lib/supabase';
 import { Sidebar, TopbarMobile, ToastStack } from './components/layout/Sidebar';
 import { ScheduleScreen } from './components/schedule/ScheduleScreen';
 import { EmployeesScreen } from './components/employees/EmployeesScreen';
@@ -101,6 +102,11 @@ function shiftErrorMessage(err: unknown): string {
   return 'Vardiya kaydedilemedi, tekrar deneyin';
 }
 
+function loadErrorMessage(err: unknown): string {
+  if (isSupabaseConfigError(err)) return err.message;
+  return "Supabase'e ulaşılamıyor. .env.local dosyasını, ağ bağlantısını ve Supabase ayarlarını kontrol edin.";
+}
+
 export default function App() {
   const [view,        setView]        = useState<ViewId>(readStoredView);
   const [mode,        setMode]        = useState<ScheduleMode>(readStoredScheduleMode);
@@ -113,7 +119,7 @@ export default function App() {
   const [shifts,      setShifts]      = useState<Shift[]>([]);
   const [activeMonth, setActiveMonth] = useState<string>(todayYearMonth);
   const [loading,     setLoading]     = useState(true);
-  const [loadError,   setLoadError]   = useState(false);
+  const [loadError,   setLoadError]   = useState<string | null>(null);
   const [shiftModalOpen, setShiftModalOpen] = useState(false);
   const [shiftToEdit,    setShiftToEdit]    = useState<Shift | null>(null);
   const [empModalOpen,   setEmpModalOpen]   = useState(false);
@@ -138,7 +144,7 @@ export default function App() {
         setShifts(shfts);
       } catch (err) {
         console.error('Veri yüklenemedi:', err);
-        setLoadError(true);
+        setLoadError(loadErrorMessage(err));
       } finally {
         setLoading(false);
       }
@@ -344,7 +350,7 @@ export default function App() {
           {loadError ? (
             <>
               <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6, color: 'var(--absent-fg)' }}>Bağlantı hatası</div>
-              <div style={{ fontSize: 13 }}>Supabase'e ulaşılamıyor. .env.local dosyasını kontrol edin.</div>
+              <div style={{ fontSize: 13, maxWidth: 420 }}>{loadError}</div>
             </>
           ) : (
             <>
