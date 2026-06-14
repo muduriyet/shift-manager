@@ -22,7 +22,6 @@ Bu dosya, mevcut proje durumu ve `TECH_DEBT_BACKLOG_CLAUDE.md` üzerinden yenide
 
 | ID | Öncelik | Başlık | Efor | Durum | Kaynak |
 | --- | --- | --- | --- | --- | --- |
-| TD-003 | P2 | Personel güncellemede snapshot reload tutarsızlığını düzelt | M | Açık | C-07 |
 | TD-004 | P3 | Vardiya modalında istihdam tarih aralığı validasyonu ekle | S | Açık | C-08 |
 | TD-007 | P3 | `xlsx`'i dinamik import'a çevir | S | Açık | C-09 |
 | TD-020 | P3 | localStorage navigation değerlerini doğrula | S | Açık | C-10 |
@@ -34,6 +33,7 @@ Bu dosya, mevcut proje durumu ve `TECH_DEBT_BACKLOG_CLAUDE.md` üzerinden yenide
 | --- | --- | --- | --- | --- |
 | TD-002 | P1 | emp/gün için tek vardiya kuralını DB'de garanti et | Tamamlandı | duplicate temizliği, `shifts_emp_id_shift_date_unique` |
 | TD-006 | P2 | Aylık grid'deki sessiz DB hatalarını görünür yap | Tamamlandı | `setCode` catch blokları toast'a bağlandı |
+| TD-003 | P2 | Personel güncellemede snapshot reload tutarsızlığını düzelt | Tamamlandı | mevcut shift snapshot'ları local state'te değiştirilmez |
 | TD-017 | P0 | Personel silmede vardiya geçmişini koru | Tamamlandı | `setEmployeeActive`, soft delete, `on delete restrict` |
 | TD-018 | P1 | Serbest saatli vardiyalar `-` koduna düşmesin | Tamamlandı | `Öz` kodu, `WORK_CODES`, `codeFromTimes` |
 | TD-015 | P1 | Shift status tutarlılığını sağla | Tamamlandı | `ShiftStatus = Planlandı/Geldi/Gelmedi`, DB check |
@@ -41,26 +41,6 @@ Bu dosya, mevcut proje durumu ve `TECH_DEBT_BACKLOG_CLAUDE.md` üzerinden yenide
 | TD-023 | P0 | Giriş/çıkış tarihi değişiminde vardiya silinmesini durdur | Tamamlandı | `isWithinEmployment`, delete bloğu kaldırıldı |
 
 ## Detaylı Aktif İş Kalemleri
-
-### TD-003 - Personel güncellemede snapshot reload tutarsızlığını düzelt
-
-Öncelik: P2
-Alan: Veri modeli / UI tutarlılığı
-Efor: M
-Durum: Açık
-
-`shifts` tablosu `station`, `dept`, `role` değerlerini tarihsel snapshot olarak tutuyor. Buna rağmen personel düzenlenince frontend local `shifts` state'ini yeni station/dept/role ile değiştiriyor; bu değişiklik DB'ye yazılmıyor. Sonuç: ekran anlık değişiyor, reload sonrası eski DB snapshot'ı geri geliyor.
-
-Önerilen çözüm:
-- Ürün kuralını seç:
-  - Tarihsel snapshot korunacaksa local `shifts` state'i güncellenmemeli.
-  - Gelecek vardiyalar yeni atamaya taşınacaksa sadece gelecek tarihli shift kayıtları DB'de update edilmeli.
-- Geçmiş/gelecek ayrımı UI'da anlaşılır olmalı.
-
-Kabul kriterleri:
-- Personel güncellemesinden sonra reload ekranı değiştirmez.
-- Geçmiş vardiya snapshot kuralı bilinçli ve tutarlı uygulanır.
-- Rapor/filtre davranışı reload öncesi ve sonrası aynı kalır.
 
 ### TD-004 - Vardiya modalında istihdam tarih aralığı validasyonu ekle
 
@@ -134,11 +114,10 @@ Kabul kriterleri:
 
 ## Önerilen Uygulama Sırası
 
-1. TD-003 snapshot reload tutarsızlığını düzelt
-2. TD-004 modal istihdam penceresi validasyonu
-3. TD-007 `xlsx` dynamic import
-4. TD-020 localStorage guard
-5. TD-014 env validation
+1. TD-004 modal istihdam penceresi validasyonu
+2. TD-007 `xlsx` dynamic import
+3. TD-020 localStorage guard
+4. TD-014 env validation
 
 ## Ertelenenler
 
@@ -177,6 +156,14 @@ Durum: Tamamlandı
 - `App.tsx` içindeki `setCode` akışında kalan sessiz `.catch(() => {})` blokları kaldırıldı.
 - Vardiya create/update/delete hataları mevcut toast mekanizmasına bağlandı.
 - Unique constraint hatası özel olarak "Bu personel için seçili tarihte zaten vardiya var" mesajını gösteriyor.
+
+### TD-003 - Personel güncellemede snapshot reload tutarsızlığını düzelt
+
+Durum: Tamamlandı
+
+- Seçenek A uygulandı: `shifts.station`, `shifts.dept`, `shifts.role` tarihsel snapshot olarak korunur.
+- Personel güncellemesinden sonra mevcut vardiyaları local state'te yeni station/dept/role ile değiştiren blok kaldırıldı.
+- Yeni vardiyalar güncel personel atamasını kullanmaya devam eder; geçmiş vardiyalar reload öncesi/sonrası aynı görünür.
 
 ### TD-017 - Personel silmede vardiya geçmişini koru
 
@@ -221,5 +208,5 @@ Durum: Tamamlandı
 
 - RLS/auth ertelenmiş olsa da anon key public JS bundle içindedir. Son ürün aşamasına geçerken bu risk tekrar ele alınmalı.
 - `unique(emp_id, shift_date)` artık var; ileride bu constraint'e çarpan manuel/import akışları kullanıcı dostu ele alınmalı.
-- TD-003 çözülmeden personel atama değişiklikleri reload öncesi/sonrası farklı görünebilir.
+- Vardiya snapshot'ları korunur; gelecek vardiyaları yeni atamaya taşıma istenirse ayrı ürün özelliği olarak tasarlanmalı.
 - `xlsx` dynamic import küçük bir iş gibi görünse de export akışı manuel doğrulanmalı.

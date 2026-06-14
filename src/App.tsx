@@ -275,12 +275,11 @@ export default function App() {
       if (id !== null) {
         const updated = await updateEmployee(id, payload);
         setEmployees(prev => prev.map(e => e.id === id ? updated : e));
-        setShifts(prev => prev.map(s =>
-          s.empId === id ? { ...s, role: form.role, station: form.station, dept: form.dept } : s
-        ));
 
-        // Giriş/çıkış aralığı dışındaki vardiyalar SİLİNMEZ; DB'de korunur ve
-        // tüm görünümlerde istihdam penceresine göre gizlenir (isWithinEmployment).
+        // Vardiya station/dept/role değerleri tarihsel snapshot'tır. Personel
+        // güncellenince mevcut vardiyalar değiştirilmez; yeni vardiyalar güncel
+        // personel atamasını kullanır. Giriş/çıkış aralığı dışındaki vardiyalar da
+        // SİLİNMEZ; DB'de korunur ve görünümlerde isWithinEmployment ile süzülür.
         toast(form.name + ' güncellendi');
       } else {
         const newEmp = await createEmployee(payload);
