@@ -77,6 +77,13 @@ create index if not exists shifts_emp_id_idx    on shifts(emp_id);
 create index if not exists shifts_day_index_idx on shifts(day_index);
 create index if not exists shifts_date_idx      on shifts(shift_date);
 
+-- Bir personel ayni tarihte tek vardiya alabilir. NULL/boş tarihli eski kayıtlar
+-- kural dışıdır; tarihli kayıtlar aylık/haftalık/günlük ekranlarda tek hücre/tek vardiya
+-- varsayımıyla çalışır.
+create unique index if not exists shifts_emp_id_shift_date_unique
+  on shifts(emp_id, shift_date)
+  where shift_date is not null and shift_date <> '';
+
 -- ---- Row Level Security ----
 -- Geliştirme aşaması için kapalı. Production'da auth ekleyip açın.
 alter table stations    disable row level security;

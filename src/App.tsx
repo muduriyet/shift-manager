@@ -60,6 +60,20 @@ function codeFromTimes(start: string, end: string): ShiftCodeKey {
   return '-';
 }
 
+function isDuplicateShiftError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as { code?: string; message?: string; details?: string };
+  const text = `${e.message ?? ''} ${e.details ?? ''}`;
+  return e.code === '23505' || text.includes('shifts_emp_id_shift_date_unique');
+}
+
+function shiftErrorMessage(err: unknown): string {
+  if (isDuplicateShiftError(err)) {
+    return 'Bu personel için seçili tarihte zaten vardiya var';
+  }
+  return 'Vardiya kaydedilemedi, tekrar deneyin';
+}
+
 export default function App() {
   const [view,        setView]        = useState<ViewId>(() => (localStorage.getItem('vy_view') as ViewId) ?? 'cizelge');
   const [mode,        setMode]        = useState<ScheduleMode>(() => (localStorage.getItem('vy_mode') as ScheduleMode) ?? 'ay');
@@ -184,29 +198,29 @@ export default function App() {
       if (existing) {
         updateShift(existing.id, { start: sc.start!, end: sc.end!, code })
           .then(updated => setShifts(prev => prev.map(s => s.id === existing.id ? updated : s)))
-          .catch(() => {});
+          .catch(err => toast(shiftErrorMessage(err)));
       } else {
         createShift({ empId: id, station: emp.station, dept: emp.dept, shiftDate: dateStr, start: sc.start!, end: sc.end!, role: emp.role, status: 'Planlandı', note: '', code })
           .then(newShift => setShifts(prev => [...prev, newShift]))
-          .catch(() => {});
+          .catch(err => toast(shiftErrorMessage(err)));
       }
     } else if (code === 'İ' || code === 'Yİ' || code === 'Üİ' || code === 'İs') {
       // Off codes stored explicitly as records with no times
       if (existing) {
         updateShift(existing.id, { start: '', end: '', code })
           .then(updated => setShifts(prev => prev.map(s => s.id === existing.id ? updated : s)))
-          .catch(() => {});
+          .catch(err => toast(shiftErrorMessage(err)));
       } else {
         createShift({ empId: id, station: emp.station, dept: emp.dept, shiftDate: dateStr, start: '', end: '', role: emp.role, status: 'Planlandı', note: '', code })
           .then(newShift => setShifts(prev => [...prev, newShift]))
-          .catch(() => {});
+          .catch(err => toast(shiftErrorMessage(err)));
       }
     } else {
       // '-' (boş): no record = empty cell, delete shift if exists
       if (existing) {
         deleteShift(existing.id)
           .then(() => setShifts(prev => prev.filter(s => s.id !== existing.id)))
-          .catch(() => {});
+          .catch(err => toast(shiftErrorMessage(err)));
       }
     }
   }, [activeMonth, employees, shifts]);
@@ -238,8 +252,8 @@ export default function App() {
       }
       setShiftModalOpen(false);
       setShiftToEdit(null);
-    } catch {
-      toast('Bir hata oluştu, tekrar deneyin');
+    } catch (err) {
+      toast(shiftErrorMessage(err));
     }
   }
 
