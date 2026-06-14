@@ -48,13 +48,10 @@ Uygulandı: fiziksel silme kaldırıldı; "Sil" yerine geri alınabilir "Pasife 
 (`is_active = false`) akışı geldi. `deleteEmployee` → `setEmployeeActive(id, active)`
 ([db.ts](src/lib/db.ts)).
 
-> **Açık takip (opsiyonel, beklemede): FK'yi `cascade` → `restrict` yap.**
-> DB seviyesinde `shifts.emp_id` hâlâ `on delete cascade` ([schema.sql:59](supabase/schema.sql)).
-> Uygulamada artık hard-delete yolu olmadığı için P0 risk (yanlış tıkla geçmiş uçması)
-> **kapandı**; cascade yalnızca doğrudan SQL çalıştırıldığında tehlike. Sıkılaştırma için
-> prod FK'si `on delete restrict`'e çevrilebilir — doğrudan SQL'le bile vardiyası olan
-> personel silinemez hale gelir. Bu **canlı şema değişikliği** olduğu için ayrı bir
-> migration ister ve uygulanmadan önce açık onay gerekir. Şimdilik beklemede.
+> **✅ Sıkılaştırma uygulandı: FK `cascade` → `restrict`.**
+> `shifts_emp_id_fkey` artık `ON DELETE RESTRICT` (prod migration:
+> `shifts_emp_id_on_delete_restrict`). Vardiyası olan personel doğrudan SQL ile bile
+> silinemez — geçmiş DB seviyesinde de korunuyor. Repo `schema.sql` de güncellendi.
 
 `shifts.emp_id` foreign key'i `on delete cascade` ile tanımlı
 ([supabase/schema.sql:59](supabase/schema.sql)). Bir personeli silersen o kişiye ait

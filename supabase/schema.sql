@@ -53,10 +53,12 @@ create table if not exists employees (
 -- ---- Vardiyalar ----
 -- station/dept/role BİLEREK text (tarihsel snapshot): vardiya o günkü atamayı
 -- dondurur; lookup sonradan değişse/silinse geçmiş kayıt etkilenmez.
+-- emp_id FK on delete restrict: vardiyası olan personel silinemez (geçmiş korunur).
+-- Uygulama silme yerine soft delete (is_active=false) kullanır.
 
 create table if not exists shifts (
   id          bigint   primary key generated always as identity,
-  emp_id      bigint   not null references employees(id) on delete cascade,
+  emp_id      bigint   not null references employees(id) on delete restrict,
   day_index   integer  not null,
   shift_date  text,
   code        text     not null default '-',
