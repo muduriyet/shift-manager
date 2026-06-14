@@ -8,6 +8,8 @@ import { Avatar } from '../ui/Avatar';
 
 interface EmployeeFormData {
   name: string;
+  shiftName: string;
+  scheduleName: string;
   station: StationName;
   dept: DepartmentName;
   role: RoleName;
@@ -47,6 +49,8 @@ export function EmployeeModal({ employee, stationNames, deptNames, roleNames, on
   const editing = !!employee;
   const [form, setForm] = useState<EmployeeFormData>({
     name:      employee?.name      ?? '',
+    shiftName: employee?.shiftName ?? '',
+    scheduleName: employee?.scheduleName ?? '',
     station:   employee?.station   ?? stationNames[0] ?? '',
     dept:      employee?.dept      ?? deptNames[0]    ?? '',
     role:      employee?.role      ?? roleNames[0] ?? '',
@@ -66,7 +70,12 @@ export function EmployeeModal({ employee, stationNames, deptNames, roleNames, on
     setSubmitted(true);
     const errs = validate(form);
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
-    onSave({ ...form, name: form.name.trim() }, employee?.id ?? null);
+    onSave({
+      ...form,
+      name: form.name.trim(),
+      shiftName: form.shiftName.trim(),
+      scheduleName: form.scheduleName.trim(),
+    }, employee?.id ?? null);
   }
 
   const previewName = form.name.trim() || (employee?.name ?? '');
@@ -106,6 +115,21 @@ export function EmployeeModal({ employee, stationNames, deptNames, roleNames, on
             />
           </Field>
         </div>
+
+        <Field label="Vardiya İsmi">
+          <Input
+            value={form.shiftName}
+            placeholder="Örn. Sabah Ekibi"
+            onChange={e => set('shiftName', e.target.value)}
+          />
+        </Field>
+        <Field label="Çizelge İsmi">
+          <Input
+            value={form.scheduleName}
+            placeholder="Örn. A Grubu"
+            onChange={e => set('scheduleName', e.target.value)}
+          />
+        </Field>
 
         <Field label="İstasyon">
           <Select value={form.station} onChange={v => set('station', v as StationName)} icon="pin" options={stationNames} />

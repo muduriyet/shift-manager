@@ -35,6 +35,8 @@ interface ShiftFormData {
 
 interface EmployeeFormData {
   name: string;
+  shiftName: string;
+  scheduleName: string;
   station: StationName;
   dept: DepartmentName;
   role: RoleName;
@@ -305,7 +307,10 @@ export default function App() {
       return;
     }
     const payload = {
-      name: form.name, stationId, deptId, roleId,
+      name: form.name,
+      shiftName: form.shiftName.trim(),
+      scheduleName: form.scheduleName.trim(),
+      stationId, deptId, roleId,
       status: form.status,
       startDate: form.startDate, endDate: form.endDate,
     };

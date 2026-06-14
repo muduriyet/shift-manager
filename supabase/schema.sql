@@ -42,6 +42,8 @@ insert into roles (name) values
 create table if not exists employees (
   id          bigint   primary key generated always as identity,
   name        text     not null,
+  shift_name  text     not null default '',
+  schedule_name text   not null default '',
   station_id  integer  not null references stations(id)    on delete restrict,
   dept_id     integer  not null references departments(id) on delete restrict,
   role_id     integer  not null references roles(id)       on delete restrict,

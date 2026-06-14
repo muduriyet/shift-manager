@@ -75,11 +75,13 @@ export async function deleteRole(id: number): Promise<void> {
 // employees.station/dept artık stations/departments tablolarına FK (id) ile bağlı.
 // İsimler okuma sırasında embedded join ile çözülür; uygulama katmanı isimle çalışmaya devam eder.
 const EMP_SELECT =
-  'id, name, is_active, start_date, end_date, station_id, dept_id, role_id, stations(name), departments(name), roles(name)';
+  'id, name, shift_name, schedule_name, is_active, start_date, end_date, station_id, dept_id, role_id, stations(name), departments(name), roles(name)';
 
 interface EmpRow {
   id: number;
   name: string;
+  shift_name: string | null;
+  schedule_name: string | null;
   is_active: boolean;
   start_date: string | null;
   end_date: string | null;
@@ -112,6 +114,8 @@ function toEmployee(r: EmpRow): Employee {
   return {
     id: r.id,
     name: r.name,
+    shiftName: r.shift_name ?? '',
+    scheduleName: r.schedule_name ?? '',
     station: (r.stations?.name ?? '') as StationName,
     dept: (r.departments?.name ?? '') as DepartmentName,
     role: (r.roles?.name ?? '') as RoleName,
@@ -152,6 +156,8 @@ export async function fetchEmployees(): Promise<Employee[]> {
 
 export async function createEmployee(form: {
   name: string;
+  shiftName: string;
+  scheduleName: string;
   stationId: number;
   deptId: number;
   roleId: number;
@@ -163,6 +169,8 @@ export async function createEmployee(form: {
     .from('employees')
     .insert({
       name: form.name,
+      shift_name: form.shiftName,
+      schedule_name: form.scheduleName,
       station_id: form.stationId,
       dept_id: form.deptId,
       role_id: form.roleId,
@@ -178,11 +186,11 @@ export async function createEmployee(form: {
 
 export async function updateEmployee(
   id: number,
-  form: { name: string; stationId: number; deptId: number; roleId: number; status: EmployeeStatus; startDate: string | null; endDate: string | null },
+  form: { name: string; shiftName: string; scheduleName: string; stationId: number; deptId: number; roleId: number; status: EmployeeStatus; startDate: string | null; endDate: string | null },
 ): Promise<Employee> {
   const { data, error } = await supabase()
     .from('employees')
-    .update({ name: form.name, station_id: form.stationId, dept_id: form.deptId, role_id: form.roleId, is_active: form.status === 'Aktif', start_date: form.startDate || null, end_date: form.endDate || null })
+    .update({ name: form.name, shift_name: form.shiftName, schedule_name: form.scheduleName, station_id: form.stationId, dept_id: form.deptId, role_id: form.roleId, is_active: form.status === 'Aktif', start_date: form.startDate || null, end_date: form.endDate || null })
     .eq('id', id)
     .select(EMP_SELECT)
     .single();

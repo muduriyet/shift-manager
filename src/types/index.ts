@@ -44,6 +44,8 @@ export interface ShiftTime {
 export interface Employee {
   id: number;
   name: string;
+  shiftName: string;
+  scheduleName: string;
   station: StationName;
   dept: DepartmentName;
   role: RoleName;
@@ -95,4 +97,3 @@ export interface NavItem {
   label: string;
   icon: string;
 }
-

@@ -33,7 +33,8 @@ export function EmployeesScreen({ employees, stationNames, deptNames, onEdit, on
     (status === 'Tümü' || e.status === status) &&
     (station === 'Tümü' || e.station === station) &&
     (dept === 'Tümü' || e.dept === dept) &&
-    (q === '' || e.name.toLocaleLowerCase('tr').includes(q.toLocaleLowerCase('tr')))
+    (q === '' || [e.name, e.shiftName, e.scheduleName]
+      .some(value => value.toLocaleLowerCase('tr').includes(q.toLocaleLowerCase('tr'))))
   );
 
   // Hiç personel yoksa "ilk personeli ekle"; varsa ama filtre elediyse "sonuç yok" göster.
@@ -102,6 +103,8 @@ export function EmployeesScreen({ employees, stationNames, deptNames, onEdit, on
                     <th>İstasyon</th>
                     <th>Departman</th>
                     <th>Görev</th>
+                    <th>Vardiya İsmi</th>
+                    <th>Çizelge İsmi</th>
                     <th style={{ textAlign: 'center' }}>Durum</th>
                     <th style={{ textAlign: 'right' }}>İşlemler</th>
                   </tr>
@@ -121,6 +124,8 @@ export function EmployeesScreen({ employees, stationNames, deptNames, onEdit, on
                       <td>{e.station}</td>
                       <td><Badge variant="dept">{e.dept}</Badge></td>
                       <td>{e.role}</td>
+                      <td>{e.shiftName || '—'}</td>
+                      <td>{e.scheduleName || '—'}</td>
                       <td style={{ textAlign: 'center' }}><Badge status={e.status} /></td>
                       <td>
                         <div className="row-actions">
@@ -162,6 +167,14 @@ export function EmployeesScreen({ employees, stationNames, deptNames, onEdit, on
                     <div style={{ gridColumn: '1 / -1' }}>
                       <div style={{ fontSize: 11, color: 'var(--subtle-foreground)', textTransform: 'uppercase', fontWeight: 600 }}>Görev</div>
                       {e.role}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--subtle-foreground)', textTransform: 'uppercase', fontWeight: 600 }}>Vardiya İsmi</div>
+                      {e.shiftName || '—'}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--subtle-foreground)', textTransform: 'uppercase', fontWeight: 600 }}>Çizelge İsmi</div>
+                      {e.scheduleName || '—'}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
