@@ -18,6 +18,12 @@ import { ReportsScreen } from './components/reports/ReportsScreen';
 import { SettingsScreen } from './components/settings/SettingsScreen';
 import { ShiftModal } from './components/modals/ShiftModal';
 import { EmployeeModal } from './components/modals/EmployeeModal';
+import { ScheduleImportModal } from './components/modals/ScheduleImportModal';
+import {
+  actionPayload,
+  type ScheduleImportApplyResult,
+  type ScheduleImportPlan,
+} from './lib/scheduleImport';
 
 interface ToastItem { id: number; msg: string }
 
@@ -126,6 +132,7 @@ export default function App() {
   const [shiftToEdit,    setShiftToEdit]    = useState<Shift | null>(null);
   const [empModalOpen,   setEmpModalOpen]   = useState(false);
   const [empToEdit,      setEmpToEdit]      = useState<Employee | null>(null);
+  const [importModalOpen, setImportModalOpen] = useState(false);
   const [drawer, setDrawer] = useState(false);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
@@ -348,6 +355,68 @@ export default function App() {
     }
   }
 
+  async function handleApplyScheduleImport(plan: ScheduleImportPlan): Promise<ScheduleImportApplyResult> {
+    const result: ScheduleImportApplyResult = {
+      created: 0,
+      updated: 0,
+      deleted: 0,
+      failed: 0,
+      statusPreserved: plan.statusPreservedCount,
+      resetToPlanned: 0,
+      skippedNames: plan.unmatchedNames,
+      errors: [],
+    };
+    let nextShifts = shifts;
+
+    for (const action of plan.actions) {
+      try {
+        if (action.kind === 'delete') {
+          if (!action.existing) continue;
+          await deleteShift(action.existing.id);
+          nextShifts = nextShifts.filter(s => s.id !== action.existing!.id);
+          result.deleted += 1;
+        } else if (action.kind === 'create') {
+          const payload = actionPayload(action);
+          const created = await createShift({
+            empId: action.emp.id,
+            station: action.emp.station,
+            dept: action.emp.dept,
+            shiftDate: action.dateStr,
+            start: payload.start,
+            end: payload.end,
+            role: action.emp.role,
+            status: 'Planlandı',
+            note: '',
+            code: payload.code,
+          });
+          nextShifts = [...nextShifts, created];
+          result.created += 1;
+        } else if (action.kind === 'update' && action.existing) {
+          const payload = actionPayload(action);
+          const updated = await updateShift(action.existing.id, {
+            station: action.emp.station,
+            dept: action.emp.dept,
+            role: action.emp.role,
+            start: payload.start,
+            end: payload.end,
+            status: 'Planlandı',
+            code: payload.code,
+          });
+          nextShifts = nextShifts.map(s => s.id === updated.id ? updated : s);
+          result.updated += 1;
+          result.resetToPlanned += 1;
+        }
+      } catch (err) {
+        result.failed += 1;
+        result.errors.push(`${action.emp.name} · ${action.dateStr}: ${shiftErrorMessage(err)}`);
+      }
+    }
+
+    setShifts(nextShifts);
+    toast(`Import tamamlandı: ${result.created} yeni, ${result.updated} güncelleme, ${result.deleted} silme`);
+    return result;
+  }
+
   if (loading || loadError) {
     return (
       <div style={{ display: 'grid', placeItems: 'center', height: '100vh', background: 'var(--background)' }}>
@@ -384,6 +453,7 @@ export default function App() {
           activeMonth={activeMonth} setActiveMonth={setActiveMonth}
           codesOf={codesOf} setCode={setCode}
           onNewShift={() => { setShiftToEdit(null); setShiftModalOpen(true); }}
+          onImport={() => setImportModalOpen(true)}
           onShiftClick={s => { setShiftToEdit(s); setShiftModalOpen(true); }}
           onCellAdd={(empId, shiftDate) => {
             const emp = employees.find(e => e.id === empId);
@@ -481,6 +551,19 @@ export default function App() {
           roleNames={roleNames}
           onClose={() => { setEmpModalOpen(false); setEmpToEdit(null); }}
           onSave={(form, id) => handleSaveEmployee(form as EmployeeFormData, id)}
+        />
+      )}
+      {importModalOpen && (
+        <ScheduleImportModal
+          employees={employees}
+          shifts={shifts}
+          stationNames={stationNames}
+          deptNames={deptNames}
+          initialStation={station}
+          initialDept={dept}
+          initialMonth={activeMonth}
+          onClose={() => setImportModalOpen(false)}
+          onApply={handleApplyScheduleImport}
         />
       )}
 

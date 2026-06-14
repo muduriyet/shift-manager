@@ -8,7 +8,7 @@ Bu dosya, teknik borç dışındaki ürün geliştirme maddelerini ve karar notl
 
 | ID | Öncelik | Başlık | Efor | Durum |
 | --- | --- | --- | --- | --- |
-| FEAT-001 | P1 | Excel'den aylık vardiya çizelgesi import et | L | Planlandı |
+| FEAT-001 | P1 | Excel'den aylık vardiya çizelgesi import et | L | MVP tamamlandı |
 
 ## Detaylı Maddeler
 
@@ -17,7 +17,15 @@ Bu dosya, teknik borç dışındaki ürün geliştirme maddelerini ve karar notl
 Öncelik: P1
 Alan: Çizelge / Import
 Efor: L
-Durum: Planlandı
+Durum: MVP tamamlandı
+
+Uygulama notu:
+
+- `Çizelge` ekranına `Excel'den İçe Aktar` akışı eklendi.
+- Seçilen şube/departman/ay için gerçek takvimli şablon Excel indirilebilir.
+- Import öncesi Excel parse edilir, doğrulama/önizleme çıkarılır ve kullanıcı onayı alınır.
+- Import uygulama aşaması frontend batch create/update/delete ile yapılır.
+- Import sonrası oluşturulan, güncellenen, silinen, atlanan ve hata alan kayıtlar raporlanır.
 
 Mevcut kullanılan vardiya Excel'i uygulamaya yüklenebilmeli. Import işleminden önce kullanıcı şube, departman ve ay seçer. Excel'deki personel isimleri, personel kartındaki `Çizelge İsmi` alanı ile normalize edilerek eşleştirilir. Import sadece seçili şube/departmandaki aktif personeller ve seçili ay kapsamına uygulanır.
 

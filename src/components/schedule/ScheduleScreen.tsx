@@ -55,6 +55,7 @@ interface ScheduleScreenProps {
   codesOf: (id: number) => ShiftCodeKey[];
   setCode: (id: number, idx: number, code: ShiftCodeKey) => void;
   onNewShift: () => void;
+  onImport: () => void;
   onShiftClick: (s: Shift) => void;
   onCellAdd: (empId: number, dateStr: string) => void;
 }
@@ -63,7 +64,7 @@ export function ScheduleScreen({
   shifts, employees, stationNames, deptNames, deptColors,
   station, setStation, dept, setDept,
   mode, setMode, activeMonth, setActiveMonth,
-  codesOf, setCode, onNewShift, onShiftClick, onCellAdd,
+  codesOf, setCode, onNewShift, onImport, onShiftClick, onCellAdd,
 }: ScheduleScreenProps) {
   // ---- Week navigation ----
   const [weekStart, setWeekStart] = useState<Date>(() => getMonday(TODAY_DATE));
@@ -159,6 +160,7 @@ export function ScheduleScreen({
               <Button variant="ghost" size="sm" icon="chevronRight" onClick={nextMonth} />
             </div>
           )}
+          <Button variant="outline" icon="download" onClick={onImport}>Excel'den İçe Aktar</Button>
           <Button icon="plus" onClick={onNewShift}>Yeni Vardiya Ekle</Button>
         </div>
       </div>
