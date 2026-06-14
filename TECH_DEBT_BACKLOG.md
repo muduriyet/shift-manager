@@ -22,7 +22,6 @@ Bu dosya, mevcut proje durumu ve `TECH_DEBT_BACKLOG_CLAUDE.md` üzerinden yenide
 
 | ID | Öncelik | Başlık | Efor | Durum | Kaynak |
 | --- | --- | --- | --- | --- | --- |
-| TD-020 | P3 | localStorage navigation değerlerini doğrula | S | Açık | C-10 |
 | TD-014 | P3 | Env validation ile bağlantı hatasını netleştir | S | Açık | C-11 |
 
 ## Tamamlanan / Kapanan Maddeler
@@ -34,6 +33,7 @@ Bu dosya, mevcut proje durumu ve `TECH_DEBT_BACKLOG_CLAUDE.md` üzerinden yenide
 | TD-003 | P2 | Personel güncellemede snapshot reload tutarsızlığını düzelt | Tamamlandı | mevcut shift snapshot'ları local state'te değiştirilmez |
 | TD-004 | P3 | Vardiya modalında istihdam tarih aralığı validasyonu ekle | Tamamlandı | `ShiftModal` ve `handleSaveShift` `isWithinEmployment` kullanır |
 | TD-007 | P3 | `xlsx`'i dinamik import'a çevir | Tamamlandı | `src/lib/excel.ts` lazy import + export loading state |
+| TD-020 | P3 | localStorage navigation değerlerini doğrula | Tamamlandı | `isViewId` / `isScheduleMode` guard + invalid key cleanup |
 | TD-017 | P0 | Personel silmede vardiya geçmişini koru | Tamamlandı | `setEmployeeActive`, soft delete, `on delete restrict` |
 | TD-018 | P1 | Serbest saatli vardiyalar `-` koduna düşmesin | Tamamlandı | `Öz` kodu, `WORK_CODES`, `codeFromTimes` |
 | TD-015 | P1 | Shift status tutarlılığını sağla | Tamamlandı | `ShiftStatus = Planlandı/Geldi/Gelmedi`, DB check |
@@ -41,24 +41,6 @@ Bu dosya, mevcut proje durumu ve `TECH_DEBT_BACKLOG_CLAUDE.md` üzerinden yenide
 | TD-023 | P0 | Giriş/çıkış tarihi değişiminde vardiya silinmesini durdur | Tamamlandı | `isWithinEmployment`, delete bloğu kaldırıldı |
 
 ## Detaylı Aktif İş Kalemleri
-
-### TD-020 - localStorage navigation değerlerini doğrula
-
-Öncelik: P3
-Alan: Sağlamlık
-Efor: S
-Durum: Açık
-
-`vy_view` ve `vy_mode` localStorage değerleri doğrudan type cast ile okunuyor. Bozuk/eski bir değer app'i geçersiz state ile açabilir.
-
-Önerilen çözüm:
-- `isViewId` ve `isScheduleMode` guard fonksiyonları ekle.
-- Geçersiz değerlerde güvenli default'a dön.
-- Bozuk değeri localStorage'dan temizle.
-
-Kabul kriterleri:
-- Geçersiz localStorage değeri boş/kırık ekran üretmez.
-- App güvenli default view/mode ile açılır.
 
 ### TD-014 - Env validation ile bağlantı hatasını netleştir
 
@@ -79,8 +61,7 @@ Kabul kriterleri:
 
 ## Önerilen Uygulama Sırası
 
-1. TD-020 localStorage guard
-2. TD-014 env validation
+1. TD-014 env validation
 
 ## Ertelenenler
 
@@ -143,6 +124,14 @@ Durum: Tamamlandı
 - Statik `xlsx` import'u `ReportsScreen` içinden kaldırıldı.
 - Ortak `exportRowsToExcel(...)` helper'ı `xlsx` paketini sadece export anında lazy import eder.
 - Export butonu işlem sırasında loading state gösterir ve tekrar tıklamayı engeller.
+
+### TD-020 - localStorage navigation değerlerini doğrula
+
+Durum: Tamamlandı
+
+- `vy_view` sadece bilinen `ViewId` değerlerinden biriyse state'e alınır.
+- `vy_mode` sadece `hafta` veya `ay` ise state'e alınır.
+- Geçersiz/eski localStorage değerleri silinir ve uygulama güvenli default olan `cizelge` / `ay` ile açılır.
 
 ### TD-017 - Personel silmede vardiya geçmişini koru
 

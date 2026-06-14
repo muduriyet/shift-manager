@@ -42,6 +42,33 @@ interface EmployeeFormData {
   endDate: string | null;
 }
 
+const DEFAULT_VIEW: ViewId = 'cizelge';
+const DEFAULT_SCHEDULE_MODE: ScheduleMode = 'ay';
+const VIEW_IDS: readonly ViewId[] = ['cizelge', 'personeller', 'gunluk', 'raporlar', 'ayarlar'];
+const SCHEDULE_MODES: readonly ScheduleMode[] = ['hafta', 'ay'];
+
+function isViewId(value: string | null): value is ViewId {
+  return value !== null && (VIEW_IDS as readonly string[]).includes(value);
+}
+
+function isScheduleMode(value: string | null): value is ScheduleMode {
+  return value !== null && (SCHEDULE_MODES as readonly string[]).includes(value);
+}
+
+function readStoredView(): ViewId {
+  const stored = localStorage.getItem('vy_view');
+  if (isViewId(stored)) return stored;
+  if (stored !== null) localStorage.removeItem('vy_view');
+  return DEFAULT_VIEW;
+}
+
+function readStoredScheduleMode(): ScheduleMode {
+  const stored = localStorage.getItem('vy_mode');
+  if (isScheduleMode(stored)) return stored;
+  if (stored !== null) localStorage.removeItem('vy_mode');
+  return DEFAULT_SCHEDULE_MODE;
+}
+
 function todayYearMonth(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -75,8 +102,8 @@ function shiftErrorMessage(err: unknown): string {
 }
 
 export default function App() {
-  const [view,        setView]        = useState<ViewId>(() => (localStorage.getItem('vy_view') as ViewId) ?? 'cizelge');
-  const [mode,        setMode]        = useState<ScheduleMode>(() => (localStorage.getItem('vy_mode') as ScheduleMode) ?? 'ay');
+  const [view,        setView]        = useState<ViewId>(readStoredView);
+  const [mode,        setMode]        = useState<ScheduleMode>(readStoredScheduleMode);
   const [station,     setStation]     = useState('Tümü');
   const [dept,        setDept]        = useState('Tümü');
   const [stations,    setStations]    = useState<Station[]>([]);
