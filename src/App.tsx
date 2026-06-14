@@ -240,6 +240,11 @@ export default function App() {
 
   async function handleSaveShift(form: ShiftFormData, id: number | null) {
     const code = codeFromTimes(form.start, form.end);
+    const emp = employees.find(e => e.id === form.empId);
+    if (emp && !isWithinEmployment(emp.startDate, emp.endDate, form.shiftDate)) {
+      toast('Seçili tarih personelin çalışma aralığı dışında');
+      return;
+    }
     try {
       if (id !== null) {
         const updated = await updateShift(id, { ...form, code });

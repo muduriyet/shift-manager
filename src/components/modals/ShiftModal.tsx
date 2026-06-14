@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Shift, Employee, ShiftCodeKey, StationName, DepartmentName, RoleName, ShiftStatus } from '../../types';
-import { STATUSES, SHIFT_TIMES, shiftById, TODAY_DATE_STR } from '../../constants';
+import { STATUSES, SHIFT_TIMES, shiftById, TODAY_DATE_STR, isWithinEmployment } from '../../constants';
 import { Dialog } from '../ui/Dialog';
 import { Button } from '../ui/Button';
 import { Field, Input, Textarea } from '../ui/Field';
@@ -21,7 +21,7 @@ interface ShiftFormData {
 
 type FormErrors = Partial<Record<keyof ShiftFormData, string>>;
 
-function validate(form: ShiftFormData): FormErrors {
+function validate(form: ShiftFormData, employees: Employee[]): FormErrors {
   const e: FormErrors = {};
   if (!form.empId || form.empId <= 0) e.empId = 'Geçerli bir personel seçin';
   if (!form.shiftDate) e.shiftDate = 'Tarih zorunludur';
@@ -29,6 +29,10 @@ function validate(form: ShiftFormData): FormErrors {
   if (!form.end)   e.end   = 'Bitiş saati zorunludur';
   if (form.start && form.end && form.start === form.end) {
     e.end = 'Başlangıç ve bitiş saati aynı olamaz';
+  }
+  const emp = employees.find(x => x.id === form.empId);
+  if (!e.empId && emp && form.shiftDate && !isWithinEmployment(emp.startDate, emp.endDate, form.shiftDate)) {
+    e.shiftDate = 'Seçili tarih personelin çalışma aralığı dışında';
   }
   return e;
 }
@@ -81,7 +85,7 @@ export function ShiftModal({ shift, employees, stationNames, deptNames, roleName
 
   function handleSave() {
     setSubmitted(true);
-    const errs = validate(form);
+    const errs = validate(form, employees);
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
     onSave(form, editing ? shift!.id : null);
   }

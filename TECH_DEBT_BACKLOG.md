@@ -22,7 +22,6 @@ Bu dosya, mevcut proje durumu ve `TECH_DEBT_BACKLOG_CLAUDE.md` üzerinden yenide
 
 | ID | Öncelik | Başlık | Efor | Durum | Kaynak |
 | --- | --- | --- | --- | --- | --- |
-| TD-004 | P3 | Vardiya modalında istihdam tarih aralığı validasyonu ekle | S | Açık | C-08 |
 | TD-007 | P3 | `xlsx`'i dinamik import'a çevir | S | Açık | C-09 |
 | TD-020 | P3 | localStorage navigation değerlerini doğrula | S | Açık | C-10 |
 | TD-014 | P3 | Env validation ile bağlantı hatasını netleştir | S | Açık | C-11 |
@@ -34,6 +33,7 @@ Bu dosya, mevcut proje durumu ve `TECH_DEBT_BACKLOG_CLAUDE.md` üzerinden yenide
 | TD-002 | P1 | emp/gün için tek vardiya kuralını DB'de garanti et | Tamamlandı | duplicate temizliği, `shifts_emp_id_shift_date_unique` |
 | TD-006 | P2 | Aylık grid'deki sessiz DB hatalarını görünür yap | Tamamlandı | `setCode` catch blokları toast'a bağlandı |
 | TD-003 | P2 | Personel güncellemede snapshot reload tutarsızlığını düzelt | Tamamlandı | mevcut shift snapshot'ları local state'te değiştirilmez |
+| TD-004 | P3 | Vardiya modalında istihdam tarih aralığı validasyonu ekle | Tamamlandı | `ShiftModal` ve `handleSaveShift` `isWithinEmployment` kullanır |
 | TD-017 | P0 | Personel silmede vardiya geçmişini koru | Tamamlandı | `setEmployeeActive`, soft delete, `on delete restrict` |
 | TD-018 | P1 | Serbest saatli vardiyalar `-` koduna düşmesin | Tamamlandı | `Öz` kodu, `WORK_CODES`, `codeFromTimes` |
 | TD-015 | P1 | Shift status tutarlılığını sağla | Tamamlandı | `ShiftStatus = Planlandı/Geldi/Gelmedi`, DB check |
@@ -41,23 +41,6 @@ Bu dosya, mevcut proje durumu ve `TECH_DEBT_BACKLOG_CLAUDE.md` üzerinden yenide
 | TD-023 | P0 | Giriş/çıkış tarihi değişiminde vardiya silinmesini durdur | Tamamlandı | `isWithinEmployment`, delete bloğu kaldırıldı |
 
 ## Detaylı Aktif İş Kalemleri
-
-### TD-004 - Vardiya modalında istihdam tarih aralığı validasyonu ekle
-
-Öncelik: P3
-Alan: İş kuralı / validasyon
-Efor: S
-Durum: Açık
-
-Aylık grid `isWithinEmployment(...)` ile işe giriş/çıkış aralığı dışındaki hücreleri engelliyor. Ancak manuel "Yeni Vardiya Ekle" modalı aynı istihdam penceresi kuralını form validasyonunda zorunlu tutmuyor.
-
-Önerilen çözüm:
-- `ShiftModal` veya `handleSaveShift` içinde seçili personel + tarih için `isWithinEmployment(...)` kontrolü ekle.
-- Modal ve grid aynı hata mesajı dilini kullansın.
-
-Kabul kriterleri:
-- Modal üzerinden istihdam penceresi dışına vardiya oluşturulamaz.
-- Grid ve modal aynı iş kuralını uygular.
 
 ### TD-007 - `xlsx`'i dinamik import'a çevir
 
@@ -114,10 +97,9 @@ Kabul kriterleri:
 
 ## Önerilen Uygulama Sırası
 
-1. TD-004 modal istihdam penceresi validasyonu
-2. TD-007 `xlsx` dynamic import
-3. TD-020 localStorage guard
-4. TD-014 env validation
+1. TD-007 `xlsx` dynamic import
+2. TD-020 localStorage guard
+3. TD-014 env validation
 
 ## Ertelenenler
 
@@ -164,6 +146,14 @@ Durum: Tamamlandı
 - Seçenek A uygulandı: `shifts.station`, `shifts.dept`, `shifts.role` tarihsel snapshot olarak korunur.
 - Personel güncellemesinden sonra mevcut vardiyaları local state'te yeni station/dept/role ile değiştiren blok kaldırıldı.
 - Yeni vardiyalar güncel personel atamasını kullanmaya devam eder; geçmiş vardiyalar reload öncesi/sonrası aynı görünür.
+
+### TD-004 - Vardiya modalında istihdam tarih aralığı validasyonu ekle
+
+Durum: Tamamlandı
+
+- `ShiftModal` validasyonu seçili personel ve tarih için `isWithinEmployment(...)` kontrolü yapar.
+- `handleSaveShift` aynı kuralı savunma katmanı olarak tekrar uygular.
+- Grid ve manuel modal artık istihdam penceresi dışı vardiya oluşturmayı aynı kuralla engeller.
 
 ### TD-017 - Personel silmede vardiya geçmişini koru
 
