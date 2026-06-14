@@ -22,7 +22,6 @@ Bu dosya, mevcut proje durumu ve `TECH_DEBT_BACKLOG_CLAUDE.md` üzerinden yenide
 
 | ID | Öncelik | Başlık | Efor | Durum | Kaynak |
 | --- | --- | --- | --- | --- | --- |
-| TD-007 | P3 | `xlsx`'i dinamik import'a çevir | S | Açık | C-09 |
 | TD-020 | P3 | localStorage navigation değerlerini doğrula | S | Açık | C-10 |
 | TD-014 | P3 | Env validation ile bağlantı hatasını netleştir | S | Açık | C-11 |
 
@@ -34,6 +33,7 @@ Bu dosya, mevcut proje durumu ve `TECH_DEBT_BACKLOG_CLAUDE.md` üzerinden yenide
 | TD-006 | P2 | Aylık grid'deki sessiz DB hatalarını görünür yap | Tamamlandı | `setCode` catch blokları toast'a bağlandı |
 | TD-003 | P2 | Personel güncellemede snapshot reload tutarsızlığını düzelt | Tamamlandı | mevcut shift snapshot'ları local state'te değiştirilmez |
 | TD-004 | P3 | Vardiya modalında istihdam tarih aralığı validasyonu ekle | Tamamlandı | `ShiftModal` ve `handleSaveShift` `isWithinEmployment` kullanır |
+| TD-007 | P3 | `xlsx`'i dinamik import'a çevir | Tamamlandı | `src/lib/excel.ts` lazy import + export loading state |
 | TD-017 | P0 | Personel silmede vardiya geçmişini koru | Tamamlandı | `setEmployeeActive`, soft delete, `on delete restrict` |
 | TD-018 | P1 | Serbest saatli vardiyalar `-` koduna düşmesin | Tamamlandı | `Öz` kodu, `WORK_CODES`, `codeFromTimes` |
 | TD-015 | P1 | Shift status tutarlılığını sağla | Tamamlandı | `ShiftStatus = Planlandı/Geldi/Gelmedi`, DB check |
@@ -41,24 +41,6 @@ Bu dosya, mevcut proje durumu ve `TECH_DEBT_BACKLOG_CLAUDE.md` üzerinden yenide
 | TD-023 | P0 | Giriş/çıkış tarihi değişiminde vardiya silinmesini durdur | Tamamlandı | `isWithinEmployment`, delete bloğu kaldırıldı |
 
 ## Detaylı Aktif İş Kalemleri
-
-### TD-007 - `xlsx`'i dinamik import'a çevir
-
-Öncelik: P3
-Alan: Performans
-Efor: S
-Durum: Açık
-
-`xlsx` sadece rapor export sırasında gerekli, ancak `ReportsScreen` içinde statik import ediliyor. Bu ana JS chunk boyutunu büyütüyor ve build uyarısına katkı veriyor.
-
-Önerilen çözüm:
-- Export anında `const XLSX = await import('xlsx')` kullan.
-- Export butonuna kısa loading state ekle.
-
-Kabul kriterleri:
-- Ana bundle küçülür.
-- Excel export davranışı aynı kalır.
-- Build uyarısı azalır veya kabul edilebilir seviyeye iner.
 
 ### TD-020 - localStorage navigation değerlerini doğrula
 
@@ -97,9 +79,8 @@ Kabul kriterleri:
 
 ## Önerilen Uygulama Sırası
 
-1. TD-007 `xlsx` dynamic import
-2. TD-020 localStorage guard
-3. TD-014 env validation
+1. TD-020 localStorage guard
+2. TD-014 env validation
 
 ## Ertelenenler
 
@@ -155,6 +136,14 @@ Durum: Tamamlandı
 - `handleSaveShift` aynı kuralı savunma katmanı olarak tekrar uygular.
 - Grid ve manuel modal artık istihdam penceresi dışı vardiya oluşturmayı aynı kuralla engeller.
 
+### TD-007 - `xlsx`'i dinamik import'a çevir
+
+Durum: Tamamlandı
+
+- Statik `xlsx` import'u `ReportsScreen` içinden kaldırıldı.
+- Ortak `exportRowsToExcel(...)` helper'ı `xlsx` paketini sadece export anında lazy import eder.
+- Export butonu işlem sırasında loading state gösterir ve tekrar tıklamayı engeller.
+
 ### TD-017 - Personel silmede vardiya geçmişini koru
 
 Durum: Tamamlandı
@@ -199,4 +188,4 @@ Durum: Tamamlandı
 - RLS/auth ertelenmiş olsa da anon key public JS bundle içindedir. Son ürün aşamasına geçerken bu risk tekrar ele alınmalı.
 - `unique(emp_id, shift_date)` artık var; ileride bu constraint'e çarpan manuel/import akışları kullanıcı dostu ele alınmalı.
 - Vardiya snapshot'ları korunur; gelecek vardiyaları yeni atamaya taşıma istenirse ayrı ürün özelliği olarak tasarlanmalı.
-- `xlsx` dynamic import küçük bir iş gibi görünse de export akışı manuel doğrulanmalı.
+- Excel export akışları manuel doğrulanmalı; ortak helper ileride yeni Excel çıktıları için tekrar kullanılabilir.

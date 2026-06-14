@@ -1,11 +1,11 @@
 import { useState, useMemo } from 'react';
-import * as XLSX from 'xlsx';
 import type { Employee, Shift } from '../../types';
 import {
   SHIFT_CODES, WORK_CODES,
   TODAY_DATE, THIS_WEEK_START, addDays, dateToStr, MONTH_SHORT_NAMES,
   isWithinEmployment,
 } from '../../constants';
+import { exportRowsToExcel } from '../../lib/excel';
 import { Button } from '../ui/Button';
 import { Select } from '../ui/Select';
 import { Icon } from '../ui/Icon';
@@ -82,6 +82,7 @@ export function ReportsScreen({ employees, shifts, stationNames, deptNames }: Re
   const [station,    setStation]    = useState('Tümü');
   const [dept,       setDept]       = useState('Tümü');
   const [absentOpen, setAbsentOpen] = useState(false);
+  const [exporting,  setExporting]  = useState(false);
 
   const range = useMemo(() => periodRange(period),     [period]);
   const prev  = useMemo(() => prevPeriodRange(period), [period]);
@@ -192,7 +193,9 @@ export function ReportsScreen({ employees, shifts, stationNames, deptNames }: Re
   const filterLabel = [station !== 'Tümü' ? station : null, dept !== 'Tümü' ? dept : null]
     .filter(Boolean).join(' · ') || 'Tüm filtreler';
 
-  function handleExport() {
+  async function handleExport() {
+    if (exporting || absentRows.length === 0) return;
+
     const rows = absentRows.map(row => ({
       'Personel':   row.emp!.name,
       'Görev':      row.emp!.role,
@@ -202,11 +205,20 @@ export function ReportsScreen({ employees, shifts, stationNames, deptNames }: Re
       'Departman':  row.s.dept,
       'Vardiya':    row.s.code,
     }));
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Gelmeyen Personel');
     const slug = range.label.toLowerCase().replace(/\s+/g, '-');
-    XLSX.writeFile(wb, `gelmeyen-personel-${slug}.xlsx`);
+
+    setExporting(true);
+    try {
+      await exportRowsToExcel({
+        rows,
+        sheetName: 'Gelmeyen Personel',
+        fileName: `gelmeyen-personel-${slug}.xlsx`,
+      });
+    } catch (error) {
+      console.error('Excel export failed', error);
+    } finally {
+      setExporting(false);
+    }
   }
 
   return (
@@ -273,8 +285,8 @@ export function ReportsScreen({ employees, shifts, stationNames, deptNames }: Re
           width={620}
           footer={
             <>
-              <Button variant="outline" icon="download" onClick={handleExport} disabled={absentRows.length === 0}>
-                Dışa Aktar
+              <Button variant="outline" icon="download" onClick={handleExport} disabled={absentRows.length === 0 || exporting}>
+                {exporting ? 'Hazırlanıyor...' : 'Dışa Aktar'}
               </Button>
               <Button variant="outline" onClick={() => setAbsentOpen(false)}>Kapat</Button>
             </>
