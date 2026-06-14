@@ -27,7 +27,7 @@ Her madde kaynak koddaki gerçek satırla doğrulandı; `dosya:satır` referansl
 | C-02 | P1 | ✅ Serbest saatli vardiyalar `-` koduna düşmesin | S | TD-018 |
 | C-03 | P1 | ✅ Status modelini tek kaynağa indir (`Geç Kaldı` tutarsızlığı) | S | TD-015 |
 | C-04 | P1 | emp/gün için tek vardiya kuralını DB'de garanti et | M | TD-002 |
-| C-05 | P2 | Aktif personel yokken `emp_id = 0` ile kayıt engelle | S | TD-019 |
+| C-05 | P2 | ✅ Aktif personel yokken `emp_id = 0` ile kayıt engelle | S | TD-019 |
 | C-06 | P2 | Aylık grid'deki sessiz `catch(() => {})` bloklarını görünür yap | S | TD-006 |
 | C-07 | P2 | Personel güncellemede snapshot reload tutarsızlığı | M | TD-003 |
 | C-08 | P3 | Vardiya modalında tarih aralığı validasyonu | S | TD-004 |
@@ -156,7 +156,13 @@ Kabul kriterleri:
 
 ### C-05 — Aktif personel yokken `emp_id = 0` ile kayıt engelle
 
-Öncelik: P2 · Efor: S · (TD-019)
+Öncelik: P2 · Efor: S · (TD-019) · **Durum: ✅ Tamamlandı**
+
+Uygulandı: `ShiftModal` aktif personel yoksa (ve düzenleme değilse) form yerine
+açıklayıcı boş-durum gösterir ("Aktif personel yok…") ve Kaydet butonu pasiftir
+([ShiftModal.tsx](src/components/modals/ShiftModal.tsx)). Ek olarak `validate`'e
+`empId` kontrolü eklendi (savunma amaçlı) — geçersiz/0 `emp_id` payload'u onSave'e
+hiç ulaşmaz; DB foreign key hatası normal akışta tetiklenmez.
 
 Modal `empId` default'u aktif personel yoksa `0`'a düşüyor
 ([ShiftModal.tsx:49](src/components/modals/ShiftModal.tsx) → `... ?? employees[0]?.id ?? 0`).

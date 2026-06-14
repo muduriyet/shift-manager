@@ -5,6 +5,7 @@ import { Dialog } from '../ui/Dialog';
 import { Button } from '../ui/Button';
 import { Field, Input, Textarea } from '../ui/Field';
 import { Select } from '../ui/Select';
+import { EmptyState } from '../ui/EmptyState';
 
 interface ShiftFormData {
   empId: number;
@@ -22,6 +23,7 @@ type FormErrors = Partial<Record<keyof ShiftFormData, string>>;
 
 function validate(form: ShiftFormData): FormErrors {
   const e: FormErrors = {};
+  if (!form.empId || form.empId <= 0) e.empId = 'Geçerli bir personel seçin';
   if (!form.shiftDate) e.shiftDate = 'Tarih zorunludur';
   if (!form.start) e.start = 'Başlangıç saati zorunludur';
   if (!form.end)   e.end   = 'Bitiş saati zorunludur';
@@ -86,6 +88,7 @@ export function ShiftModal({ shift, employees, stationNames, deptNames, roleName
 
   const timeTemplate = SHIFT_TIMES.find(t => t.start === form.start && t.end === form.end)?.id ?? '';
   const activeEmployees = employees.filter(e => e.status === 'Aktif');
+  const noActive = activeEmployees.length === 0;
 
   return (
     <Dialog
@@ -95,17 +98,27 @@ export function ShiftModal({ shift, employees, stationNames, deptNames, roleName
       footer={
         <>
           <Button variant="outline" onClick={onClose}>Vazgeç</Button>
-          <Button icon="check" onClick={handleSave}>Kaydet</Button>
+          <Button icon="check" onClick={handleSave} disabled={noActive && !editing}>Kaydet</Button>
         </>
       }
     >
+      {noActive && !editing ? (
+        <div className="dialog-body">
+          <EmptyState
+            icon="users"
+            title="Aktif personel yok"
+            description="Vardiya oluşturmak için önce Personeller sayfasından en az bir personeli aktif edin."
+          />
+        </div>
+      ) : (
       <div className="dialog-body">
         <div className="col-2">
-          <Field label="Personel">
+          <Field label="Personel" error={errors.empId}>
             <Select
               value={form.empId}
               onChange={v => pickEmp(Number(v))}
               options={activeEmployees.map(e => ({ value: e.id, label: `${e.name} · ${e.station}/${e.dept}` }))}
+              error={!!errors.empId}
             />
           </Field>
         </div>
@@ -181,6 +194,7 @@ export function ShiftModal({ shift, employees, stationNames, deptNames, roleName
           </Field>
         </div>
       </div>
+      )}
     </Dialog>
   );
 }
