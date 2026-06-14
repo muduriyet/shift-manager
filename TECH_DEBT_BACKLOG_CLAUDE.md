@@ -25,7 +25,7 @@ Her madde kaynak koddaki gerçek satırla doğrulandı; `dosya:satır` referansl
 | --- | --- | --- | --- | --- |
 | C-01 | P0 | ✅ Personel silmede vardiya geçmişini koru (soft delete) | M | TD-017 |
 | C-02 | P1 | ✅ Serbest saatli vardiyalar `-` koduna düşmesin | S | TD-018 |
-| C-03 | P1 | Status modelini tek kaynağa indir (`Geç Kaldı` tutarsızlığı) | S | TD-015 |
+| C-03 | P1 | ✅ Status modelini tek kaynağa indir (`Geç Kaldı` tutarsızlığı) | S | TD-015 |
 | C-04 | P1 | emp/gün için tek vardiya kuralını DB'de garanti et | M | TD-002 |
 | C-05 | P2 | Aktif personel yokken `emp_id = 0` ile kayıt engelle | S | TD-019 |
 | C-06 | P2 | Aylık grid'deki sessiz `catch(() => {})` bloklarını görünür yap | S | TD-006 |
@@ -101,7 +101,16 @@ Kabul kriterleri:
 
 ### C-03 — Status modelini tek kaynağa indir (`Geç Kaldı` tutarsızlığı)
 
-Öncelik: P1 · Efor: S · (TD-015)
+Öncelik: P1 · Efor: S · (TD-015) · **Durum: ✅ Tamamlandı**
+
+Karar: `Geç Kaldı` kullanılmıyor → modelden çıkarıldı. Tipten ([types/index.ts](src/types/index.ts)),
+Badge eşlemesinden ([Badge.tsx](src/components/ui/Badge.tsx)), Reports `came` sayımından
+([ReportsScreen.tsx](src/components/reports/ReportsScreen.tsx)) ve ölü `.badge-late` /
+`--late-*` CSS'ten temizlendi. Prod'da `Geç Kaldı` kaydı yoktu (Geldi 22 / Gelmedi 8 /
+Planlandı 473), veri göçü gerekmedi. Geçerli statüler artık tek küme: `Planlandı`, `Geldi`,
+`Gelmedi` — Reports ve Daily aynı listeyi kullanıyor. DB seviyesinde de tek küme:
+`shifts_status_check` constraint eklendi (migration `shifts_status_check_constraint`),
+geçersiz status artık DB'de de reddedilir. schema.sql güncellendi.
 
 `Geç Kaldı` status'u sistemde yarım bağlı ve ekranlar bu yüzden **farklı sayıyor**:
 - Tip olarak geçerli: [types:21](src/types/index.ts)

@@ -40,7 +40,7 @@ Vardiya kontrolleri bir gün gecikmeli yapılır — 11 Haziran'ın devam kontro
 | role | text | |
 | station | text | |
 | dept | text | |
-| status | text | `Planlandı` \| `Geldi` \| `Geç Kaldı` \| `Gelmedi` |
+| status | text | `Planlandı` \| `Geldi` \| `Gelmedi` |
 | note | text | |
 
 ---

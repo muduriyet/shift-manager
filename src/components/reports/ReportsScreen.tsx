@@ -58,7 +58,7 @@ function calcRate(shifts: Shift[]): number | null {
     s => WORK_CODES.includes(s.code) && s.status !== 'Planlandı',
   );
   if (!work.length) return null;
-  const came = work.filter(s => s.status === 'Geldi' || s.status === 'Geç Kaldı').length;
+  const came = work.filter(s => s.status === 'Geldi').length;
   return Math.round((came / work.length) * 100);
 }
 

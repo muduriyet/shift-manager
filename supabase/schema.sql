@@ -67,7 +67,8 @@ create table if not exists shifts (
   role        text     not null,
   station     text     not null,
   dept        text     not null,
-  status      text     not null default 'Planlandı',
+  status      text     not null default 'Planlandı'
+              constraint shifts_status_check check (status in ('Planlandı', 'Geldi', 'Gelmedi')),
   note        text     not null default ''
 );
 

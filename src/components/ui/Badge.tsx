@@ -3,7 +3,6 @@ import type { ReactNode } from 'react';
 const STATUS_BADGE: Record<string, string> = {
   Planlandı:    'badge-plan',
   Geldi:        'badge-came',
-  'Geç Kaldı':  'badge-late',
   Gelmedi:      'badge-absent',
   Aktif:        'badge-active',
   Pasif:        'badge-passive',

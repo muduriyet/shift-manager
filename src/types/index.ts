@@ -18,7 +18,7 @@ export interface Role {
 }
 export type RoleName = string;
 export type ShiftCodeKey = 'S' | 'Ö' | 'G' | 'Öz' | 'İ' | 'Yİ' | 'Üİ' | 'İs' | '-';
-export type ShiftStatus = 'Planlandı' | 'Geldi' | 'Geç Kaldı' | 'Gelmedi';
+export type ShiftStatus = 'Planlandı' | 'Geldi' | 'Gelmedi';
 export type EmployeeStatus = 'Aktif' | 'Pasif';
 export type ViewId = 'cizelge' | 'personeller' | 'gunluk' | 'raporlar' | 'ayarlar';
 export type ScheduleMode = 'hafta' | 'ay';
