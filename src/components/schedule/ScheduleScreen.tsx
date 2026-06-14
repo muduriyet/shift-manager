@@ -191,7 +191,7 @@ export function ScheduleScreen({
           />
         </div>
         <div className="desk-only">
-          <CodeLegend codes={mode === 'ay' ? ['S', 'Ö', 'G', 'İ', 'Yİ', 'Üİ', 'İs'] : ['S', 'Ö', 'G']} />
+          <CodeLegend codes={mode === 'ay' ? ['S', 'Ö', 'G', 'Öz', 'İ', 'Yİ', 'Üİ', 'İs'] : ['S', 'Ö', 'G', 'Öz']} />
         </div>
       </div>
 

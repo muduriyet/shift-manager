@@ -14,7 +14,7 @@ export function CodeLegend({ codes = ['S', 'Ö', 'G', 'İ', 'Yİ'] }: CodeLegend
           <span className="cl" key={c}>
             <span className={`sc-pill ${sc.cls}`}>{c}</span>
             {sc.label}
-            {sc.work && (
+            {sc.work && sc.start && sc.end && (
               <span className="tm" style={{ color: 'var(--subtle-foreground)' }}>
                 {sc.start}–{sc.end}
               </span>

@@ -280,6 +280,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
   --sc-s-bg:#e0f2fe;  --sc-s-fg:#0369a1;  --sc-s-bd:#bae6fd;
   --sc-o-bg:#fef3c7;  --sc-o-fg:#b45309;  --sc-o-bd:#fde68a;
   --sc-g-bg:#ede9fe;  --sc-g-fg:#6d28d9;  --sc-g-bd:#ddd6fe;
+  --sc-oz-bg:#cffafe; --sc-oz-fg:#0e7490; --sc-oz-bd:#a5f3fc;
   --sc-i-bg:#f1f5f9;  --sc-i-fg:#94a3b8;  --sc-i-bd:#e2e8f0;
   --sc-yi-bg:#ffe4e6; --sc-yi-fg:#be123c; --sc-yi-bd:#fecdd3;
   --sc-ui-bg:#fff7ed; --sc-ui-fg:#c2410c; --sc-ui-bd:#fed7aa;
@@ -288,6 +289,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
 .sc-s  { background: var(--sc-s-bg);  color: var(--sc-s-fg);  border-color: var(--sc-s-bd); }
 .sc-o  { background: var(--sc-o-bg);  color: var(--sc-o-fg);  border-color: var(--sc-o-bd); }
 .sc-g  { background: var(--sc-g-bg);  color: var(--sc-g-fg);  border-color: var(--sc-g-bd); }
+.sc-oz { background: var(--sc-oz-bg); color: var(--sc-oz-fg); border-color: var(--sc-oz-bd); }
 .sc-i  { background: var(--sc-i-bg);  color: var(--sc-i-fg);  border-color: var(--sc-i-bd); }
 .sc-yi { background: var(--sc-yi-bg); color: var(--sc-yi-fg); border-color: var(--sc-yi-bd); }
 .sc-ui { background: var(--sc-ui-bg); color: var(--sc-ui-fg); border-color: var(--sc-ui-bd); }

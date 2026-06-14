@@ -24,7 +24,7 @@ Her madde kaynak koddaki gerçek satırla doğrulandı; `dosya:satır` referansl
 | ID | Öncelik | Başlık | Efor | Karşılık |
 | --- | --- | --- | --- | --- |
 | C-01 | P0 | ✅ Personel silmede vardiya geçmişini koru (soft delete) | M | TD-017 |
-| C-02 | P1 | Serbest saatli vardiyalar `-` koduna düşmesin | S | TD-018 |
+| C-02 | P1 | ✅ Serbest saatli vardiyalar `-` koduna düşmesin | S | TD-018 |
 | C-03 | P1 | Status modelini tek kaynağa indir (`Geç Kaldı` tutarsızlığı) | S | TD-015 |
 | C-04 | P1 | emp/gün için tek vardiya kuralını DB'de garanti et | M | TD-002 |
 | C-05 | P2 | Aktif personel yokken `emp_id = 0` ile kayıt engelle | S | TD-019 |
@@ -76,7 +76,14 @@ Kabul kriterleri:
 
 ### C-02 — Serbest saatli vardiyalar `-` koduna düşmesin
 
-Öncelik: P1 · Efor: S · (TD-018)
+Öncelik: P1 · Efor: S · (TD-018) · **Durum: ✅ Tamamlandı**
+
+Uygulandı (seçilen yaklaşım: "Özel" çalışma kodu): yeni `Öz` (Özel) kodu eklendi ve
+`WORK_CODES`'a dahil edildi — yani serbest saatli vardiyalar artık çalışma sayılıyor.
+`codeFromTimes` şablon dışı geçerli saatler için `-` yerine `Öz` döner
+([App.tsx](src/App.tsx)). `Öz` serbest saatlidir; bu yüzden `SHIFT_TIMES` sabit şablonlardan
+(S/Ö/G) ayrıştırıldı ve `Öz`, grid hızlı-seçicisine (`ALL_CODES`) eklenmedi — modaldan özel
+saatle oluşturulur. Cyan `sc-oz` rozeti + legend'de "Özel" gösterimi eklendi.
 
 `codeFromTimes` yalnızca üç sabit şablonu tanıyor; başka her saat aralığı `-` döner
 ([src/App.tsx:55](src/App.tsx)). Vardiya modalı serbest saat girişine izin verdiği için

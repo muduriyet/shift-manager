@@ -9,6 +9,7 @@ export const SHIFT_CODES: Record<ShiftCodeKey, ShiftCodeDef> = {
   'S':  { key: 'S',  label: 'Sabah',       start: '08:00', end: '16:00', cls: 'sc-s',    work: true },
   'Ö':  { key: 'Ö',  label: 'Öğlen',       start: '16:00', end: '00:00', cls: 'sc-o',    work: true },
   'G':  { key: 'G',  label: 'Gece',        start: '00:00', end: '08:00', cls: 'sc-g',    work: true },
+  'Öz': { key: 'Öz', label: 'Özel',                                      cls: 'sc-oz',   work: true },
   'İ':  { key: 'İ',  label: 'İzin',          cls: 'sc-i',     off: true },
   'Yİ': { key: 'Yİ', label: 'Yıllık İzin',  cls: 'sc-yi',    off: true },
   'Üİ': { key: 'Üİ', label: 'Ücretsiz İzin', cls: 'sc-ui',   off: true },
@@ -16,10 +17,16 @@ export const SHIFT_CODES: Record<ShiftCodeKey, ShiftCodeDef> = {
   '-':  { key: '-',  label: 'Boş',           cls: 'sc-empty', off: true, empty: true },
 };
 
-export const WORK_CODES: ShiftCodeKey[] = ['S', 'Ö', 'G'];
+// 'Öz' (Özel) serbest saatli bir çalışma kodudur: sabit şablonu yoktur, saatler
+// vardiya kaydından gelir. Çalışma sayıldığı için WORK_CODES'a dahildir ama grid
+// hızlı-seçicisinde (ALL_CODES) yer almaz — modaldan özel saatle oluşturulur.
+export const WORK_CODES: ShiftCodeKey[] = ['S', 'Ö', 'G', 'Öz'];
 export const ALL_CODES: ShiftCodeKey[] = ['S', 'Ö', 'G', 'İ', 'Yİ', 'Üİ', 'İs', '-'];
 
-export const SHIFT_TIMES: ShiftTime[] = WORK_CODES.map(k => ({
+// Sabit saatli hazır şablonlar (modal/ayarlardaki şablon butonları bunları kullanır).
+const TEMPLATE_CODES: ShiftCodeKey[] = ['S', 'Ö', 'G'];
+
+export const SHIFT_TIMES: ShiftTime[] = TEMPLATE_CODES.map(k => ({
   id: k as ShiftCodeKey,
   start: SHIFT_CODES[k].start!,
   end: SHIFT_CODES[k].end!,

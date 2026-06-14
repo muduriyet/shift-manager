@@ -4,7 +4,7 @@ import { SHIFT_CODES, ALL_CODES, isWithinEmployment } from '../../constants';
 import type { MonthDay } from '../../types';
 import { Icon } from '../ui/Icon';
 
-const SHIFT_SORT_ORDER: Record<string, number> = { S: 0, Ö: 1, G: 2, İ: 3, Yİ: 4, '-': 5 };
+const SHIFT_SORT_ORDER: Record<string, number> = { S: 0, Ö: 1, G: 2, 'Öz': 3, İ: 4, Yİ: 5, '-': 6 };
 
 interface DragState {
   empId: number;

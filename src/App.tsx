@@ -56,6 +56,7 @@ function codeFromTimes(start: string, end: string): ShiftCodeKey {
   if (start === '08:00' && end === '16:00') return 'S';
   if (start === '16:00' && end === '00:00') return 'Ö';
   if (start === '00:00' && end === '08:00') return 'G';
+  if (start && end) return 'Öz';  // şablon dışı, serbest saatli çalışma vardiyası
   return '-';
 }
 
