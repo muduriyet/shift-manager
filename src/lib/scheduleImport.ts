@@ -9,6 +9,9 @@ const FIRST_EMP_ROW = 3; // 4
 const DAY_SHORTS = ['PT', 'S', 'Ç', 'P', 'C', 'CT', 'P'];
 
 type ImportCode = Exclude<ShiftCodeKey, 'Öz' | '-'>;
+// 'Öz' parse aşamasında geçerlidir ama oluşturulamaz (saatleri Excel temsil edemez);
+// import'ta o hücre mevcut kaydı korur — bkz buildPlanFromRows döngüsü.
+type ParsedCode = ImportCode | 'Öz';
 
 export interface ScheduleImportScope {
   station: string;
@@ -75,7 +78,7 @@ export interface ScheduleImportApplyResult {
 interface ParsedExcelRow {
   excelName: string;
   normalizedName: string;
-  codes: Array<ImportCode | null>;
+  codes: Array<ParsedCode | null>;
 }
 
 function daysForMonth(yearMonth: string): string[] {
@@ -114,12 +117,12 @@ function colName(index: number): string {
   return out;
 }
 
-function normalizeCode(value: unknown): ImportCode | null | 'INVALID' {
+function normalizeCode(value: unknown): ParsedCode | null | 'INVALID' {
   const text = cellText(value);
   if (!text) return null;
   const normalized = normalizeScheduleName(text);
-  const byCode = new Map<string, ImportCode>(
-    (['S', 'Ö', 'G', 'İ', 'Yİ', 'Üİ', 'İs'] as ImportCode[]).map(code => [
+  const byCode = new Map<string, ParsedCode>(
+    (['S', 'Ö', 'G', 'Öz', 'İ', 'Yİ', 'Üİ', 'İs'] as ParsedCode[]).map(code => [
       normalizeScheduleName(code),
       code,
     ]),
@@ -256,7 +259,7 @@ function buildPlanFromRows(
   for (let rowIdx = FIRST_EMP_ROW; rowIdx < rows.length; rowIdx += 1) {
     const excelName = cellText(rows[rowIdx]?.[NAME_COL]);
     if (!excelName) continue;
-    const codes: Array<ImportCode | null> = [];
+    const codes: Array<ParsedCode | null> = [];
     for (let dayIdx = 0; dayIdx < days.length; dayIdx += 1) {
       const raw = rows[rowIdx]?.[FIRST_DAY_COL + dayIdx];
       const code = normalizeCode(raw);
@@ -318,6 +321,7 @@ function buildPlanFromRows(
   const actions: ScheduleImportAction[] = [];
   let statusPreservedCount = 0;
   let resetStatusCount = 0;
+  let ozPreservedCount = 0;
 
   people.forEach(emp => {
     const desiredRow = desiredByEmployee.get(emp.id);
@@ -325,6 +329,12 @@ function buildPlanFromRows(
       if (!isWithinEmployment(emp.startDate, emp.endDate, dateStr)) return;
       const existing = existingByCell.get(shiftKey(emp.id, dateStr));
       const desiredCode = desiredRow?.codes[dayIdx] ?? null;
+
+      if (desiredCode === 'Öz') {
+        // Serbest saatli hücre: Excel saatleri temsil edemez → mevcut kayıt korunur.
+        if (existing) ozPreservedCount += 1;
+        return;
+      }
 
       if (!desiredCode) {
         if (existing) actions.push({ kind: 'delete', emp, dateStr, existing });
@@ -345,6 +355,10 @@ function buildPlanFromRows(
       actions.push({ kind: 'update', emp, dateStr, existing, code: desiredCode });
     });
   });
+
+  if (ozPreservedCount > 0) {
+    warnings.push(`${ozPreservedCount} özel (Öz) hücre korundu — serbest saatli vardiyalar Excel üzerinden değiştirilmez.`);
+  }
 
   const summary = {
     create: actions.filter(a => a.kind === 'create').length,

@@ -1,6 +1,6 @@
 # Vardiya Yönetimi
 
-İki istasyon ve dört departmanı olan bir akaryakıt işletmesi için Türkçe vardiya yönetim uygulaması.
+İki istasyonlu (Ümraniye, Şile), her istasyonda iki departmanlı (Akaryakıt, Market) bir akaryakıt işletmesi için Türkçe vardiya yönetim uygulaması.
 
 ## Teknoloji
 
@@ -44,11 +44,11 @@ npm run dev
 
 | Ekran | Açıklama |
 |---|---|
-| Vardiya Çizelgesi | Aylık/haftalık vardiya planlama grid'i |
-| Personel Listesi | Personel CRUD, işe giriş/çıkış tarihleri |
+| Vardiya Çizelgesi | Aylık/haftalık planlama grid'i + Excel içe/dışa aktarım |
+| Personel Listesi | Personel CRUD, işe giriş/çıkış tarihleri, soft delete (Aktif/Pasif filtre) |
 | Günlük Kontrol | Günlük devam durumu takibi (varsayılan: dün) |
-| Raporlar | Haftalık devam özeti, gelmeyen personel detayı |
-| Ayarlar | İstasyon, departman ve vardiya saati görünümü |
+| Raporlar | Devam oranı, departman bazlı devam, gelmeyen personel + Excel export |
+| Ayarlar | İstasyon, departman, görev ekle/sil ve vardiya saatleri |
 
 ## Vardiya Kodları
 
@@ -57,6 +57,7 @@ npm run dev
 | S | Sabah | 08:00 – 16:00 |
 | Ö | Öğlen | 16:00 – 00:00 |
 | G | Gece | 00:00 – 08:00 |
+| Öz | Özel | serbest saat |
 | İ | İzin | — |
 | Yİ | Yıllık İzin | — |
 | Üİ | Ücretsiz İzin | — |
@@ -75,16 +76,21 @@ src/
     employees/EmployeesScreen
     reports/  ReportsScreen
     settings/ SettingsScreen
-    modals/   ShiftModal, EmployeeModal
-    ui/       Button, Badge, Avatar, Select, Field, Dialog, Stat, Icon, EmptyState
+    modals/   ShiftModal, EmployeeModal, ScheduleImportModal, ScheduleExportModal
+    ui/       Button, Badge, Avatar, Select, Field, Dialog, Stat, Icon, EmptyState, DropdownButton
   lib/
-    supabase.ts   Supabase istemcisi
-    db.ts         Tüm DB fonksiyonları (CRUD)
+    supabase.ts        Supabase istemcisi (env doğrulama + lazy client)
+    db.ts              Tüm DB fonksiyonları (CRUD + batch import)
+    excel.ts           Ortak lazy xlsx export yardımcısı
+    scheduleImport.ts  Excel'den çizelge import (parse, doğrulama, plan)
+    scheduleExport.ts  Çizelgeyi template'li Excel'e export
   types/index.ts  TypeScript tip tanımları
   constants/      Vardiya kodları, sabitler, tarih araçları
   index.css       Tasarım token'ları ve tüm stiller
+public/
+  templates/vardiya-export-template.xlsx   Export stil template'i
 supabase/
-  schema.sql      Tablo tanımları
+  schema.sql      Tablo tanımları (sıfırdan kurulum için yeterli)
 ```
 
 ## Deploy

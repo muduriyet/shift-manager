@@ -9,7 +9,7 @@ Bu dosya, teknik borç dışındaki ürün geliştirme maddelerini ve karar notl
 | ID | Öncelik | Başlık | Efor | Durum |
 | --- | --- | --- | --- | --- |
 | FEAT-001 | P1 | Excel'den aylık vardiya çizelgesi import et | L | MVP tamamlandı |
-| FEAT-002 | P1 | Aylık vardiya çizelgesini Excel'e export et | M | Planlandı |
+| FEAT-002 | P1 | Aylık vardiya çizelgesini Excel'e export et | M | Tamamlandı |
 
 ## Detaylı Maddeler
 
@@ -98,6 +98,7 @@ Format doğrulama hatası örnekleri:
 - Geçersiz vardiya kodu varsa import bloklanır.
 - `S`, `Ö`, `G` çalışma vardiyasıdır.
 - `İ`, `Yİ`, `Üİ`, `İs` izin/off kodlarıdır.
+- `Öz` (serbest saatli) hücreleri import'u bloklamaz; saatleri Excel temsil edemediği için o gün **mevcut kayıt korunur** (değiştirilmez), önizlemede "korundu" uyarısı gösterilir.
 - `S`, `Ö`, `G` saatleri mevcut uygulama sabitleriyle aynıdır:
   - `S`: 08:00-16:00
   - `Ö`: 16:00-00:00
@@ -182,7 +183,7 @@ Import sonrası rapor:
 Öncelik: P1
 Alan: Çizelge / Export
 Efor: M
-Durum: Planlandı
+Durum: Tamamlandı
 
 Kullanıcı `Vardiya Çizelgesi` ekranından seçtiği şube, departman ve ay için mevcut vardiya çizelgesini Excel olarak indirebilmelidir. Export, son onaylanan stilli aylık formatta üretilir ve sadece seçilen kapsamı içerir.
 

@@ -26,14 +26,14 @@ Her madde kaynak koddaki gerçek satırla doğrulandı; `dosya:satır` referansl
 | C-01 | P0 | ✅ Personel silmede vardiya geçmişini koru (soft delete) | M | TD-017 |
 | C-02 | P1 | ✅ Serbest saatli vardiyalar `-` koduna düşmesin | S | TD-018 |
 | C-03 | P1 | ✅ Status modelini tek kaynağa indir (`Geç Kaldı` tutarsızlığı) | S | TD-015 |
-| C-04 | P1 | emp/gün için tek vardiya kuralını DB'de garanti et | M | TD-002 |
+| C-04 | P1 | ✅ emp/gün için tek vardiya kuralını DB'de garanti et | M | TD-002 |
 | C-05 | P2 | ✅ Aktif personel yokken `emp_id = 0` ile kayıt engelle | S | TD-019 |
-| C-06 | P2 | Aylık grid'deki sessiz `catch(() => {})` bloklarını görünür yap | S | TD-006 |
-| C-07 | P2 | Personel güncellemede snapshot reload tutarsızlığı | M | TD-003 |
-| C-08 | P3 | Vardiya modalında tarih aralığı validasyonu | S | TD-004 |
-| C-09 | P3 | `xlsx`'i dinamik import'a çevir (bundle uyarısı) | S | TD-007 |
-| C-10 | P3 | localStorage navigation değerlerini doğrula | S | TD-020 |
-| C-11 | P3 | Env validation: bağlantı hatasını netleştir | S | TD-014 |
+| C-06 | P2 | ✅ Aylık grid'deki sessiz `catch(() => {})` bloklarını görünür yap | S | TD-006 |
+| C-07 | P2 | ✅ Personel güncellemede snapshot reload tutarsızlığı | M | TD-003 |
+| C-08 | P3 | ✅ Vardiya modalında tarih aralığı validasyonu | S | TD-004 |
+| C-09 | P3 | ✅ `xlsx`'i dinamik import'a çevir (bundle uyarısı) | S | TD-007 |
+| C-10 | P3 | ✅ localStorage navigation değerlerini doğrula | S | TD-020 |
+| C-11 | P3 | ✅ Env validation: bağlantı hatasını netleştir | S | TD-014 |
 | C-12 | P0 | ✅ Giriş/çıkış tarihi değişiminde vardiya silinmesini durdur + pencereyi tüm görünümlerde uygula | M | (yeni) |
 
 ---
@@ -135,7 +135,9 @@ Kabul kriterleri:
 
 ### C-04 — emp/gün için tek vardiya kuralını DB'de garanti et
 
-Öncelik: P1 · Efor: M · (TD-002)
+Öncelik: P1 · Efor: M · (TD-002) · **Durum: ✅ Tamamlandı (Codex)**
+
+> Uygulandı: DB'de `shifts_emp_id_shift_date_unique` partial unique index (emp_id, shift_date) eklendi — aynı personel/gün için çift kayıt DB'de engellenir.
 
 `shifts` tablosunda `unique(emp_id, shift_date)` yok ([schema.sql:57](supabase/schema.sql)).
 Oysa kod zaten "bir personel / bir gün = tek vardiya" varsayıyor: aylık türetme
@@ -178,7 +180,9 @@ Kabul kriterleri:
 
 ### C-06 — Aylık grid'deki sessiz `catch(() => {})` bloklarını görünür yap
 
-Öncelik: P2 · Efor: S · (TD-006)
+Öncelik: P2 · Efor: S · (TD-006) · **Durum: ✅ Tamamlandı (Codex)**
+
+> Uygulandı: `setCode` catch blokları `toast(shiftErrorMessage(err))` ile görünür yapıldı; sessiz `catch(() => {})` kalmadı.
 
 `setCode` içindeki beş DB çağrısı hatayı tamamen yutuyor
 ([App.tsx:187,191,198,202,209](src/App.tsx)). Bu çağrılar başarı olunca state'i
@@ -196,7 +200,9 @@ Kabul kriterleri:
 
 ### C-07 — Personel güncellemede snapshot reload tutarsızlığı
 
-Öncelik: P2 · Efor: M · (TD-003)
+Öncelik: P2 · Efor: M · (TD-003) · **Durum: ✅ Tamamlandı (Codex)**
+
+> Uygulandı: `handleSaveEmployee` artık yerel shift state'ini mutate etmiyor; snapshot korunuyor, reload sonrası ekran tutarlı.
 
 Personel düzenlenince local `shifts` state'i yeni isimlerle değiştiriliyor ama bu
 **DB'ye yazılmıyor** ([App.tsx:264-266](src/App.tsx)). Ekran anında değişir, sayfa
@@ -215,7 +221,9 @@ Kabul kriterleri:
 
 ### C-08 — Vardiya modalında tarih aralığı validasyonu
 
-Öncelik: P3 · Efor: S · (TD-004)
+Öncelik: P3 · Efor: S · (TD-004) · **Durum: ✅ Tamamlandı (Codex)**
+
+> Uygulandı: ShiftModal validate + `handleSaveShift` `isWithinEmployment` ile aralık dışı tarihi reddediyor (grid ile tutarlı).
 
 Aylık grid, personelin işe giriş/çıkış tarihi dışına atama yapmayı engelliyor
 ([App.tsx:177-178](src/App.tsx)). Manuel "Yeni Vardiya Ekle" modalı aynı kuralı
@@ -231,7 +239,9 @@ Kabul kriterleri:
 
 ### C-09 — `xlsx`'i dinamik import'a çevir
 
-Öncelik: P3 · Efor: S · (TD-007)
+Öncelik: P3 · Efor: S · (TD-007) · **Durum: ✅ Tamamlandı (Codex)**
+
+> Uygulandı: `xlsx` dinamik import'a alındı; build'de ayrı chunk (429 kB), ana bundle'da değil.
 
 `xlsx` ana bundle'a statik giriyor ([ReportsScreen.tsx:2](src/components/reports/ReportsScreen.tsx))
 ve build 500 kB+ uyarısı veriyor. Sadece rapor export'unda gerekli.
@@ -246,7 +256,9 @@ Kabul kriterleri:
 
 ### C-10 — localStorage navigation değerlerini doğrula
 
-Öncelik: P3 · Efor: S · (TD-020)
+Öncelik: P3 · Efor: S · (TD-020) · **Durum: ✅ Tamamlandı (Codex)**
+
+> Uygulandı: `isViewId` / `isScheduleMode` guard'ları eklendi; geçersiz localStorage değeri güvenli default'a düşüyor.
 
 `vy_view` ve `vy_mode` doğrudan cast ile okunuyor
 ([App.tsx:63-64](src/App.tsx)). Bozuk/eski bir değer app'i geçersiz ekranla açabilir.
@@ -259,7 +271,9 @@ Kabul kriterleri:
 
 ### C-11 — Env validation: bağlantı hatasını netleştir
 
-Öncelik: P3 · Efor: S · (TD-014)
+Öncelik: P3 · Efor: S · (TD-014) · **Durum: ✅ Tamamlandı (Codex)**
+
+> Uygulandı: `supabase.ts` env doğrulaması + `SupabaseConfigError`; eksik/hatalı env net konsol/ekran mesajı veriyor.
 
 `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` eksik/yanlışsa hata sadece genel
 yükleme hatası olarak görünüyor ([src/lib/supabase.ts:4-5](src/lib/supabase.ts)).
