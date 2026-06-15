@@ -8,6 +8,7 @@ import {
 } from '../../constants';
 import { Stat } from '../ui/Stat';
 import { Button } from '../ui/Button';
+import { DropdownButton } from '../ui/DropdownButton';
 import { Select } from '../ui/Select';
 import { Icon } from '../ui/Icon';
 import { CodeLegend } from './CodeLegend';
@@ -55,6 +56,7 @@ interface ScheduleScreenProps {
   codesOf: (id: number) => ShiftCodeKey[];
   setCode: (id: number, idx: number, code: ShiftCodeKey) => void;
   onNewShift: () => void;
+  onExport: () => void;
   onImport: () => void;
   onShiftClick: (s: Shift) => void;
   onCellAdd: (empId: number, dateStr: string) => void;
@@ -64,7 +66,7 @@ export function ScheduleScreen({
   shifts, employees, stationNames, deptNames, deptColors,
   station, setStation, dept, setDept,
   mode, setMode, activeMonth, setActiveMonth,
-  codesOf, setCode, onNewShift, onImport, onShiftClick, onCellAdd,
+  codesOf, setCode, onNewShift, onExport, onImport, onShiftClick, onCellAdd,
 }: ScheduleScreenProps) {
   // ---- Week navigation ----
   const [weekStart, setWeekStart] = useState<Date>(() => getMonday(TODAY_DATE));
@@ -160,7 +162,14 @@ export function ScheduleScreen({
               <Button variant="ghost" size="sm" icon="chevronRight" onClick={nextMonth} />
             </div>
           )}
-          <Button variant="outline" icon="download" onClick={onImport}>Excel'den İçe Aktar</Button>
+          <DropdownButton
+            label="Excel"
+            icon="download"
+            actions={[
+              { label: "Excel'e Aktar", icon: 'download', onClick: onExport },
+              { label: "Excel'den İçe Aktar", icon: 'inbox', onClick: onImport },
+            ]}
+          />
           <Button icon="plus" onClick={onNewShift}>Yeni Vardiya Ekle</Button>
         </div>
       </div>

@@ -19,6 +19,7 @@ import { SettingsScreen } from './components/settings/SettingsScreen';
 import { ShiftModal } from './components/modals/ShiftModal';
 import { EmployeeModal } from './components/modals/EmployeeModal';
 import { ScheduleImportModal } from './components/modals/ScheduleImportModal';
+import { ScheduleExportModal } from './components/modals/ScheduleExportModal';
 import {
   actionPayload,
   type ScheduleImportApplyResult,
@@ -132,6 +133,7 @@ export default function App() {
   const [shiftToEdit,    setShiftToEdit]    = useState<Shift | null>(null);
   const [empModalOpen,   setEmpModalOpen]   = useState(false);
   const [empToEdit,      setEmpToEdit]      = useState<Employee | null>(null);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [drawer, setDrawer] = useState(false);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
@@ -453,6 +455,7 @@ export default function App() {
           activeMonth={activeMonth} setActiveMonth={setActiveMonth}
           codesOf={codesOf} setCode={setCode}
           onNewShift={() => { setShiftToEdit(null); setShiftModalOpen(true); }}
+          onExport={() => setExportModalOpen(true)}
           onImport={() => setImportModalOpen(true)}
           onShiftClick={s => { setShiftToEdit(s); setShiftModalOpen(true); }}
           onCellAdd={(empId, shiftDate) => {
@@ -564,6 +567,18 @@ export default function App() {
           initialMonth={activeMonth}
           onClose={() => setImportModalOpen(false)}
           onApply={handleApplyScheduleImport}
+        />
+      )}
+      {exportModalOpen && (
+        <ScheduleExportModal
+          employees={employees}
+          shifts={shifts}
+          stationNames={stationNames}
+          deptNames={deptNames}
+          initialStation={station}
+          initialDept={dept}
+          initialMonth={activeMonth}
+          onClose={() => setExportModalOpen(false)}
         />
       )}
 

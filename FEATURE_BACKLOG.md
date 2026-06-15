@@ -9,6 +9,7 @@ Bu dosya, teknik borç dışındaki ürün geliştirme maddelerini ve karar notl
 | ID | Öncelik | Başlık | Efor | Durum |
 | --- | --- | --- | --- | --- |
 | FEAT-001 | P1 | Excel'den aylık vardiya çizelgesi import et | L | MVP tamamlandı |
+| FEAT-002 | P1 | Aylık vardiya çizelgesini Excel'e export et | M | Planlandı |
 
 ## Detaylı Maddeler
 
@@ -175,3 +176,109 @@ Import sonrası rapor:
 - Frontend batch import sırasında ağ kesilirse kısmi başarı oluşabilir; sonuç raporu bunu görünür yapmalı.
 - Çok büyük Excel dosyalarında işlem süresi uzayabilir.
 - `Çizelge İsmi` alanları doldurulmadan import pratikte eşleşme üretemez.
+
+### FEAT-002 - Aylık vardiya çizelgesini Excel'e export et
+
+Öncelik: P1
+Alan: Çizelge / Export
+Efor: M
+Durum: Planlandı
+
+Kullanıcı `Vardiya Çizelgesi` ekranından seçtiği şube, departman ve ay için mevcut vardiya çizelgesini Excel olarak indirebilmelidir. Export, son onaylanan stilli aylık formatta üretilir ve sadece seçilen kapsamı içerir.
+
+#### Önerilen Ekran ve Akış
+
+Feature, `Vardiya Çizelgesi` ekranındaki `Excel` dropdown menüsünden başlatılır.
+
+Dropdown seçenekleri:
+
+- `Excel'e Aktar`
+- `Excel'den İçe Aktar`
+
+Export akışı:
+
+1. Kullanıcı `Excel > Excel'e Aktar` seçeneğine basar.
+2. `Excel'e Aktar` modalı açılır.
+3. Kullanıcı şube, departman ve ay seçer.
+4. Şube, departman ve ay alanları zorunludur.
+5. Şube/departman listelerinde sadece aktif personel bulunan kombinasyonlar seçilebilir.
+6. Kullanıcı `Excel Oluştur` butonuna basar.
+7. Sistem seçili kapsam için Excel dosyasını oluşturur ve indirir.
+
+#### Ürün Kararları
+
+- Export sadece aylık formatta üretilir.
+- Kullanıcı hafta görünümündeyken de export modalı ay seçimiyle çalışır.
+- `Tümü` seçeneği export kapsamında desteklenmez.
+- Kapsamın genişleyip sistemi gereksiz yormaması için şube ve departman seçimi zorunludur.
+- Personel olmayan şube/departman kombinasyonları seçilemez.
+- Personel sıralaması mevcut uygulama/DB sırasıyla korunur.
+- Personel kolonu önyüzdeki `Ad Soyad` bilgisini kullanır.
+- Status bilgisi export'a dahil edilmez.
+- Boş vardiya hücreleri boş kalır.
+- İstihdam tarihi dışındaki günler boş kalır.
+- Excel tek sheet olarak üretilir.
+- Excel'e filtre eklenmez.
+
+#### Excel Formatı
+
+Export dosyası son onaylanan stilli/merge'li formatta olmalıdır:
+
+- Başlık seçili şube/departman ve ay bilgisini içerir.
+- Personel başlığı `B2:B3` olarak dikey merge edilir.
+- Gün bilgileri aylık grid yapısında kalır:
+  - 2. satırda gün kısaltmaları
+  - 3. satırda gün numaraları
+- Personel adları `B4` satırından başlar.
+- Vardiya kodları gün hücrelerine yazılır.
+- Sağ tarafta personel bazlı toplamlar bulunur:
+  - `S`, `Ö`, `G`, `Öz`, `İ`, `Yİ`, `Üİ`, `İs`
+  - `Çalışma`
+  - `İzin`
+  - `Toplam`
+- Toplam başlıkları dikey merge edilir.
+- En altta genel toplam satırı bulunur.
+- Vardiya grid'i kodlara göre renklendirilir.
+- Hafta sonları hafif farklı arka planla ayrıştırılır.
+- Genel toplam satırı görsel olarak vurgulanır.
+
+Dosya adı:
+
+`vardiya-cizelgesi-{sube}-{departman}-{yyyy-mm}.xlsx`
+
+Örnek:
+
+`vardiya-cizelgesi-umraniye-akaryakit-2026-06.xlsx`
+
+#### Teknik Notlar
+
+- Export işlemi frontend'de lazy/dinamik Excel import yaklaşımıyla yapılmalıdır.
+- `xlsx` paketi ilk bundle'a statik eklenmemelidir.
+- Import şablonu ve export üretimi benzer takvim/helper fonksiyonlarını paylaşabilir.
+- Export helper'ı UI bileşenlerinden ayrı tutulmalıdır.
+- Export modalı, import modalındaki aktif personel bulunan şube/departman filtreleme mantığıyla tutarlı olmalıdır.
+- Export formatı kod içinde sıfırdan stillendirilmemelidir; onaylanan Excel dosyası proje içinde template olarak tutulmalıdır.
+- Template dosyası `public/templates/vardiya-export-template.xlsx` altında bulunmalıdır.
+- Export sırasında template workbook paket yapısı ve `styles.xml` korunmalı; sadece `xl/worksheets/sheet1.xml` seçili kapsam verisiyle güncellenmelidir.
+- Template üzerinden ilerlemek Excel corruption riskini azaltır ve ileride görsel format değişikliklerini Excel üzerinde düzenlemeyi kolaylaştırır.
+
+#### Kabul Kriterleri
+
+- Kullanıcı `Excel > Excel'e Aktar` ile export modalını açabilir.
+- Kullanıcı şube, departman ve ay seçmeden export başlatamaz.
+- Şube/departman listelerinde sadece aktif personel bulunan kapsamlar seçilebilir.
+- Export sadece seçili şube/departman/ay için üretilir.
+- Çıktıda personel isimleri `Ad Soyad` olarak görünür.
+- Çıktıda personel bazlı kod toplamları, çalışma toplamı, izin toplamı ve toplam bulunur.
+- Çıktıda genel toplam satırı bulunur.
+- Excel dosyası son onaylanan stilli/merge'li formatla uyumludur.
+- Excel dosyası proje içindeki template baz alınarak üretilir.
+- Export dosyasında filtre bulunmaz.
+- Export dosyası tek sheet olarak oluşur.
+- `npm.cmd run build` başarılı geçer.
+
+#### Riskler
+
+- Çok kalabalık departmanlarda frontend Excel üretimi süre alabilir.
+- `Öz` vardiyalarının saat detayı export'a dahil edilmez; sadece kod toplamına yansır.
+- Excel stillerinin farklı Excel/LibreOffice sürümlerinde küçük görsel farklılıkları olabilir.
