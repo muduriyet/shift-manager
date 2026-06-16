@@ -32,11 +32,14 @@ function buildFlat(groups: MonthGroup[], empOrder: EmpOrderMap): Employee[] {
   return flat;
 }
 
-function defaultOrder(g: MonthGroup, codesOf: (id: number) => ShiftCodeKey[], todayMidx: number): number[] {
+// sortMidx = sıralama çapası gün indeksi. null ise (bugün o ayda yok ve gün seçilmedi)
+// kod sıralaması yapılmaz, isme göre sıralanır.
+function defaultOrder(g: MonthGroup, codesOf: (id: number) => ShiftCodeKey[], sortMidx: number | null): number[] {
   return [...g.emps]
     .sort((a, b) => {
-      const ca = codesOf(a.id)[todayMidx] ?? '-';
-      const cb = codesOf(b.id)[todayMidx] ?? '-';
+      if (sortMidx === null) return a.name.localeCompare(b.name, 'tr');
+      const ca = codesOf(a.id)[sortMidx] ?? '-';
+      const cb = codesOf(b.id)[sortMidx] ?? '-';
       const oa = SHIFT_SORT_ORDER[ca] ?? 5;
       const ob = SHIFT_SORT_ORDER[cb] ?? 5;
       return oa !== ob ? oa - ob : a.name.localeCompare(b.name, 'tr');
@@ -66,11 +69,14 @@ export function MonthlyView({ groups, codesOf, setCode, monthDays, todayMidx, mo
   const [picker, setPicker] = useState<PickerPos | null>(null);
   const [warning, setWarning] = useState<{ x: number; y: number; msg: string } | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
+  const [sortMidx, setSortMidx] = useState<number | null>(todayMidx >= 0 ? todayMidx : null);
   const [empOrder, setEmpOrder] = useState<EmpOrderMap>(() => {
+    const anchor = todayMidx >= 0 ? todayMidx : null;
     const o: EmpOrderMap = {};
-    groups.forEach(g => { o[g.label] = defaultOrder(g, codesOf, todayMidx); });
+    groups.forEach(g => { o[g.label] = defaultOrder(g, codesOf, anchor); });
     return o;
   });
+  const sortInit = useRef(true);
 
   const selectingRef = useRef(false);
   const selRef = useRef<Selection | null>(null);
@@ -89,13 +95,31 @@ export function MonthlyView({ groups, codesOf, setCode, monthDays, todayMidx, mo
       groups.forEach(g => {
         const prevOrder = prev[g.label];
         const same = prevOrder && prevOrder.length === g.emps.length && g.emps.every(e => prevOrder.includes(e.id));
-        next[g.label] = same ? prevOrder : defaultOrder(g, codesOf, todayMidx);
+        next[g.label] = same ? prevOrder : defaultOrder(g, codesOf, sortMidx);
         if (!same) changed = true;
       });
       return changed ? next : prev;
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupsSnap]);
+
+  // Ay değişince sıralama günü varsayılana döner (bugün o ayda varsa bugün, yoksa sıralama yok).
+  // Filtre (istasyon/departman) değişiminde seçili gün korunur.
+  useEffect(() => {
+    setSortMidx(todayMidx >= 0 ? todayMidx : null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMonth]);
+
+  // Sıralama günü değişince tüm gruplar yeniden sıralanır (manuel sürükle-sıra ezilir).
+  useEffect(() => {
+    if (sortInit.current) { sortInit.current = false; return; }
+    setEmpOrder(() => {
+      const o: EmpOrderMap = {};
+      groups.forEach(g => { o[g.label] = defaultOrder(g, codesOf, sortMidx); });
+      return o;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortMidx]);
 
   const flat = buildFlat(groups, empOrder);
   flatRef.current = flat;
@@ -250,7 +274,12 @@ export function MonthlyView({ groups, codesOf, setCode, monthDays, todayMidx, mo
                 Personel
               </th>
               {monthDays.map((d, i) => (
-                <th key={i} className={`m-day${d.weekend ? ' wknd' : ''}${i === todayMidx ? ' today' : ''}`}>
+                <th
+                  key={i}
+                  className={`m-day${d.weekend ? ' wknd' : ''}${i === todayMidx ? ' today' : ''}${i === sortMidx ? ' sortday' : ''}`}
+                  onClick={() => setSortMidx(i)}
+                  title="Bu güne göre sırala"
+                >
                   <span className="wd">{d.wShort}</span>
                   <span className="dn tnum">{d.n}</span>
                 </th>
@@ -277,6 +306,7 @@ export function MonthlyView({ groups, codesOf, setCode, monthDays, todayMidx, mo
                   empUp={empUp}
                   monthDays={monthDays}
                   todayMidx={todayMidx}
+                  sortMidx={sortMidx}
                   monthShort={monthShort}
                   activeMonth={activeMonth}
                 />
@@ -353,11 +383,12 @@ interface GroupRowsProps {
   empUp: () => void;
   monthDays: MonthDay[];
   todayMidx: number;
+  sortMidx: number | null;
   monthShort: string;
   activeMonth: string;
 }
 
-function GroupRows({ group, orderedEmps, drag, codesOf, rowOf, isSel, startSel, extendSel, empDown, empUp, monthDays, todayMidx, monthShort, activeMonth }: GroupRowsProps) {
+function GroupRows({ group, orderedEmps, drag, codesOf, rowOf, isSel, startSel, extendSel, empDown, empUp, monthDays, todayMidx, sortMidx, monthShort, activeMonth }: GroupRowsProps) {
   return (
     <>
       <tr className="m-team-row">
@@ -412,6 +443,7 @@ function GroupRows({ group, orderedEmps, drag, codesOf, rowOf, isSel, startSel, 
                     'm-cell',
                     d.weekend ? 'col-wknd' : '',
                     idx === todayMidx ? 'col-today' : '',
+                    idx === sortMidx ? 'col-sortday' : '',
                     isSel(r, idx) ? 'sel' : '',
                     blocked ? 'm-cell-blocked' : '',
                   ].filter(Boolean).join(' ')}

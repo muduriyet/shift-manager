@@ -10,6 +10,7 @@ Bu dosya, teknik borç dışındaki ürün geliştirme maddelerini ve karar notl
 | --- | --- | --- | --- | --- |
 | FEAT-001 | P1 | Excel'den aylık vardiya çizelgesi import et | L | MVP tamamlandı |
 | FEAT-002 | P1 | Aylık vardiya çizelgesini Excel'e export et | M | Tamamlandı |
+| FEAT-003 | P2 | Çizelge grid'inde gün-seçimli sıralama | S | Tamamlandı |
 
 ## Detaylı Maddeler
 
@@ -283,3 +284,35 @@ Dosya adı:
 - Çok kalabalık departmanlarda frontend Excel üretimi süre alabilir.
 - `Öz` vardiyalarının saat detayı export'a dahil edilmez; sadece kod toplamına yansır.
 - Excel stillerinin farklı Excel/LibreOffice sürümlerinde küçük görsel farklılıkları olabilir.
+
+### FEAT-003 - Çizelge grid'inde gün-seçimli sıralama
+
+Öncelik: P2
+Alan: Çizelge / UX
+Efor: S
+Durum: Tamamlandı
+
+Aylık ve haftalık çizelge grid'inde sıralamayı belirleyen "çapa gün" artık kullanıcı tarafından seçilebilir. Önceden sıralama her zaman bugüne göre sabitti; artık herhangi bir gün başlığına tıklanarak o günün vardiya koduna göre sıralama yapılabilir.
+
+#### Davranış / Ürün Kararları
+
+- Sıralama düzeni: `S → Ö → G → Öz → İ/Yİ/Üİ/İs → boş`, eşitlikte ada göre (mevcut `SHIFT_SORT_ORDER`).
+- Tıklama hedefi: gün başlığı (haftagünü + numara). Hücre seçimi/sürükleme davranışı bozulmaz.
+- Seçili gün görsel olarak işaretlenir (mavi alt çizgi + sütun tonu); bugün ayrı işaretli kalır (aylıkta mavi başlık, haftalıkta "BUGÜN" rozeti).
+- Varsayılan = bugün (görüntülenen ay/haftada ise). Bugün görünmüyorsa sıralama yapılmaz, isim sırası korunur; bir güne tıklanınca sıralanır.
+- Ay/hafta değişince seçim varsayılana döner; istasyon/departman filtresi değişince seçili gün korunur.
+- Gün seçimi yeniden sıralar (manuel sürükle-sıra ezilir); sonrasında yine elle sürüklenebilir. Sadece sıralama çapası — güne göre filtreleme yapılmaz.
+- Kapsam: aylık grid + haftalık masaüstü tablo. Mobil haftalık gün-kartı düzeni gün-merkezli olduğu için kapsam dışı.
+
+#### Teknik Notlar
+
+- `MonthlyView`: `sortMidx` state (varsayılan bugün veya null), `defaultOrder(..., sortMidx)`, ay değişiminde reset efekti, sıralama-günü değişiminde tüm grupları yeniden sıralayan efekt.
+- `WeeklyView`: `sortIndex` state, hafta değişiminde reset efekti, seçili güne göre sıralama.
+- Salt UI/state özelliği; DB'ye yazma yok.
+
+#### Kabul Kriterleri
+
+- Gün başlığına tıklayınca grid o günün koduna göre S→Ö→G sıralanır ve seçili gün işaretlenir.
+- Bugün görünmeyen ay/haftada varsayılan sıralama yapılmaz; gün seçilince sıralanır.
+- Ay/hafta değişince seçim varsayılana döner; filtre değişince korunur.
+- `npm run build` başarılı geçer.

@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import type { Shift, Employee, MonthGroup, WeekDay } from '../../types';
 import { SHIFT_CODES, WORK_CODES, MONTH_SHORT_NAMES, isWithinEmployment } from '../../constants';
 import { Avatar } from '../ui/Avatar';
@@ -33,14 +34,23 @@ interface WeeklyViewProps {
 }
 
 export function WeeklyView({ groups, shifts, employeeMap, weekDays, todayIndex, onShiftClick, onNewShift, onAddShift }: WeeklyViewProps) {
-  const codeOrder: Record<string, number> = { S: 0, Ö: 1, G: 2 };
+  const codeOrder: Record<string, number> = { S: 0, Ö: 1, G: 2, 'Öz': 3 };
+
+  // Sıralama çapası gün indeksi. null ise (bugün o haftada yok ve gün seçilmedi) isme göre sıralanır.
+  const [sortIndex, setSortIndex] = useState<number | null>(todayIndex >= 0 ? todayIndex : null);
+  const weekKey = weekDays[0]?.dateStr;
+  useEffect(() => {
+    setSortIndex(todayIndex >= 0 ? todayIndex : null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekKey]);
 
   const sortedGroups = groups.map(g => ({
     ...g,
     emps: [...g.emps].sort((a, b) => {
-      const todayDate = todayIndex >= 0 ? weekDays[todayIndex].dateStr : '';
-      const sa = shifts.find(x => x.empId === a.id && x.shiftDate === todayDate);
-      const sb = shifts.find(x => x.empId === b.id && x.shiftDate === todayDate);
+      if (sortIndex === null) return a.name.localeCompare(b.name, 'tr');
+      const sortDate = weekDays[sortIndex].dateStr;
+      const sa = shifts.find(x => x.empId === a.id && x.shiftDate === sortDate);
+      const sb = shifts.find(x => x.empId === b.id && x.shiftDate === sortDate);
       const ra = sa ? (codeOrder[sa.code] ?? 8) : 9;
       const rb = sb ? (codeOrder[sb.code] ?? 8) : 9;
       return ra !== rb ? ra - rb : a.name.localeCompare(b.name, 'tr');
@@ -68,7 +78,12 @@ export function WeeklyView({ groups, shifts, employeeMap, weekDays, todayIndex, 
           <tr>
             <th className="col-emp">Personel</th>
             {weekDays.map((d, i) => (
-              <th key={i} className={`col-day${i === todayIndex ? ' today' : ''}`}>
+              <th
+                key={i}
+                className={`col-day${i === todayIndex ? ' today' : ''}${i === sortIndex ? ' sortday' : ''}`}
+                onClick={() => setSortIndex(i)}
+                title="Bu güne göre sırala"
+              >
                 <b>{d.short}</b>{' '}
                 <span className="tnum">{d.date}</span>
                 {i === todayIndex && <span className="today-pill">BUGÜN</span>}
@@ -84,6 +99,7 @@ export function WeeklyView({ groups, shifts, employeeMap, weekDays, todayIndex, 
               shifts={shifts}
               weekDays={weekDays}
               todayIndex={todayIndex}
+              sortIndex={sortIndex}
               onShiftClick={onShiftClick}
               onAddShift={onAddShift}
             />
@@ -141,11 +157,12 @@ interface TableGroupProps {
   shifts: Shift[];
   weekDays: WeekDay[];
   todayIndex: number;
+  sortIndex: number | null;
   onShiftClick: (s: Shift) => void;
   onAddShift: (empId: number, dateStr: string) => void;
 }
 
-function TableGroup({ group, shifts, weekDays, todayIndex, onShiftClick, onAddShift }: TableGroupProps) {
+function TableGroup({ group, shifts, weekDays, todayIndex, sortIndex, onShiftClick, onAddShift }: TableGroupProps) {
   return (
     <>
       <tr className="group-row">
@@ -176,7 +193,7 @@ function TableGroup({ group, shifts, weekDays, todayIndex, onShiftClick, onAddSh
             const isToday = di === todayIndex;
             const isPast  = todayIndex >= 0 && di < todayIndex;
             const outside = !isWithinEmployment(emp.startDate, emp.endDate, d.dateStr);
-            const cls = `day-cell${isToday ? ' is-today' : isPast ? ' is-past' : ''}${outside ? ' is-outside' : ''}`;
+            const cls = `day-cell${isToday ? ' is-today' : isPast ? ' is-past' : ''}${outside ? ' is-outside' : ''}${di === sortIndex ? ' is-sortday' : ''}`;
             return (
               <td key={di} className={cls}>
                 {outside

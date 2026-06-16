@@ -338,6 +338,17 @@ table.month { border-collapse: separate; border-spacing: 0; min-width: 100%; use
 .month .m-cell.col-today { background: rgba(30,58,138,.05); }
 .month tbody tr:hover .m-cell { background: var(--surface-2); }
 .month tbody tr:hover .m-cell.col-today { background: rgba(30,58,138,.08); }
+/* sıralama günü: tıklanabilir başlık + seçili sütun vurgusu */
+.month .m-day { cursor: pointer; }
+.month .m-day:hover:not(.today) { background: var(--surface-2); }
+.month .m-day.sortday { box-shadow: inset 0 -3px 0 var(--primary); }
+.month .m-cell.col-sortday { background: rgba(30,58,138,.10); }
+.month tbody tr:hover .m-cell.col-sortday { background: rgba(30,58,138,.13); }
+.sched .col-day { cursor: pointer; }
+.sched .col-day:hover { background: var(--surface-2); }
+.sched .col-day.sortday { box-shadow: inset 0 -3px 0 var(--primary); }
+.sched .col-day.sortday b { color: var(--primary); }
+.sched .day-cell.is-sortday { background: rgba(30,58,138,.06); }
 .sc-pill {
   display: grid; place-items: center; width: 28px; height: 26px; margin: 0 auto;
   border-radius: 6px; border: 1px solid transparent; font-size: 12px; font-weight: 700;
