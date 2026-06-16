@@ -221,7 +221,6 @@ export function ScheduleScreen({
         <WeeklyView
           groups={weekGroups}
           shifts={weekShifts}
-          employeeMap={employeeMap}
           weekDays={weekDays}
           todayIndex={todayIndex}
           onShiftClick={onShiftClick}

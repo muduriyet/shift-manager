@@ -94,9 +94,8 @@ export function EmployeesScreen({ employees, stationNames, deptNames, onEdit, on
           />
         ) : (
           <>
-            {/* Desktop table */}
-            <div className="table-wrap desk-only">
-              <table className="tbl">
+            <div className="table-wrap">
+              <table className="tbl" style={{ minWidth: 760 }}>
                 <thead>
                   <tr>
                     <th>Ad Soyad</th>
@@ -141,52 +140,6 @@ export function EmployeesScreen({ employees, stationNames, deptNames, onEdit, on
                   ))}
                 </tbody>
               </table>
-            </div>
-
-            {/* Mobile cards */}
-            <div className="only-mobile emp-cards">
-              {rows.map(e => (
-                <div key={e.id} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 14 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-                    <Avatar name={e.name} size={40} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <b style={{ fontSize: 15 }}>{e.name}</b>
-                      <div style={{ fontSize: 12.5, color: 'var(--muted-foreground)' }}>{e.role}</div>
-                    </div>
-                    <Badge status={e.status} dot />
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 12, fontSize: 13 }}>
-                    <div>
-                      <div style={{ fontSize: 11, color: 'var(--subtle-foreground)', textTransform: 'uppercase', fontWeight: 600 }}>İstasyon</div>
-                      {e.station}
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 11, color: 'var(--subtle-foreground)', textTransform: 'uppercase', fontWeight: 600 }}>Departman</div>
-                      {e.dept}
-                    </div>
-                    <div style={{ gridColumn: '1 / -1' }}>
-                      <div style={{ fontSize: 11, color: 'var(--subtle-foreground)', textTransform: 'uppercase', fontWeight: 600 }}>Görev</div>
-                      {e.role}
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 11, color: 'var(--subtle-foreground)', textTransform: 'uppercase', fontWeight: 600 }}>Vardiya İsmi</div>
-                      {e.shiftName || '—'}
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 11, color: 'var(--subtle-foreground)', textTransform: 'uppercase', fontWeight: 600 }}>Çizelge İsmi</div>
-                      {e.scheduleName || '—'}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-                    <Button variant="outline" size="sm" icon="pencil" onClick={() => onEdit(e)} style={{ flex: 1 }}>Düzenle</Button>
-                    {e.status === 'Aktif' ? (
-                      <Button variant="ghost" size="sm" icon="userX" onClick={() => handleDeactivateClick(e.id)} title="Pasife Al" />
-                    ) : (
-                      <Button variant="ghost" size="sm" icon="userCheck" onClick={() => onSetActive(e.id, true)} title="Aktif Et" />
-                    )}
-                  </div>
-                </div>
-              ))}
             </div>
           </>
         )}

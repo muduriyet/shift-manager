@@ -25,7 +25,6 @@ function outsideReason(emp: Employee, dateStr: string): string {
 interface WeeklyViewProps {
   groups: MonthGroup[];
   shifts: Shift[];
-  employeeMap: Map<number, Employee>;
   weekDays: WeekDay[];
   todayIndex: number;   // -1 if today is not in this week
   onShiftClick: (s: Shift) => void;
@@ -33,7 +32,7 @@ interface WeeklyViewProps {
   onAddShift: (empId: number, dateStr: string) => void;
 }
 
-export function WeeklyView({ groups, shifts, employeeMap, weekDays, todayIndex, onShiftClick, onNewShift, onAddShift }: WeeklyViewProps) {
+export function WeeklyView({ groups, shifts, weekDays, todayIndex, onShiftClick, onNewShift, onAddShift }: WeeklyViewProps) {
   const codeOrder: Record<string, number> = { S: 0, Ö: 1, G: 2, 'Öz': 3 };
 
   // Sıralama çapası gün indeksi. null ise (bugün o haftada yok ve gün seçilmedi) isme göre sıralanır.
@@ -71,9 +70,8 @@ export function WeeklyView({ groups, shifts, employeeMap, weekDays, todayIndex, 
   }
 
   return (
-    <div className="sched-scroll as-cards" style={{ borderRadius: '0 0 var(--radius-lg) var(--radius-lg)' }}>
-      {/* Desktop table */}
-      <table className="sched desk-only">
+    <div className="sched-scroll" style={{ borderRadius: '0 0 var(--radius-lg) var(--radius-lg)' }}>
+      <table className="sched">
         <thead>
           <tr>
             <th className="col-emp">Personel</th>
@@ -106,48 +104,6 @@ export function WeeklyView({ groups, shifts, employeeMap, weekDays, todayIndex, 
           ))}
         </tbody>
       </table>
-
-      {/* Mobile day cards */}
-      <div className="daycards">
-        {weekDays.map((d, di) => {
-          const dayShifts = shifts.filter(s => s.shiftDate === d.dateStr);
-          return (
-            <div className="daycard" key={di}>
-              <div className="daycard-head">
-                <b>{d.key} <span className="tnum" style={{ color: 'var(--muted-foreground)', fontWeight: 500 }}>{d.date}</span></b>
-                {di === todayIndex && (
-                  <span className="today-pill" style={{ background: 'var(--primary)' }}>BUGÜN</span>
-                )}
-              </div>
-              <div className="daycard-body">
-                {dayShifts.length === 0
-                  ? <div className="day-off">Bu gün için vardiya yok</div>
-                  : dayShifts.map(s => {
-                      const emp = employeeMap.get(s.empId);
-                      if (!emp) return null;
-                      return (
-                        <div
-                          key={s.id}
-                          className={`daycard-shift coded ${SHIFT_CODES[s.code]?.cls ?? ''}`}
-                          onClick={() => onShiftClick(s)}
-                        >
-                          <Avatar name={emp.name} size={36} />
-                          <div style={{ minWidth: 0, flex: 1 }}>
-                            <b style={{ fontSize: 14 }}>{emp.name}</b>
-                            <div style={{ fontSize: 12.5, color: 'var(--muted-foreground)' }}>
-                              {SHIFT_CODES[s.code]?.label} · {s.station} / {s.dept}
-                            </div>
-                          </div>
-                          {(WORK_CODES as readonly string[]).includes(s.code) && <Badge status={s.status} dot />}
-                        </div>
-                      );
-                    })
-                }
-              </div>
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }
