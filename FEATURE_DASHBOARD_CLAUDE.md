@@ -131,7 +131,7 @@ değerleri birebir üretiyor — ek karar gerekmiyor.
 - **DoD:** Golden dosyalarla `canApply=true` + doğru değerler; eksik fiyat/hatalı
   formül/yanlış sheet senaryoları bloklanıyor.
 
-### [ ] SD-06 — Routing + ekran kabuğu + Tabs
+### [x] SD-06 — Routing + ekran kabuğu + Tabs
 - **Bağımlılık:** SD-03 (ViewId)
 - **Kapsam:** `ui/Tabs.tsx` (yeni, `.segment` desenini genişlet / `.tabs` CSS).
   `sales/SalesScreen.tsx` (3 sekme kabı). Sidebar `NAV` += `{id:'satis',

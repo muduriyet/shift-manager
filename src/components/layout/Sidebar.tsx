@@ -8,6 +8,7 @@ const NAV: NavItem[] = [
   { id: 'personeller', label: 'Personel Listesi', icon: 'users' },
   { id: 'gunluk',     label: 'Günlük Kontrol',  icon: 'clipboard' },
   { id: 'raporlar',   label: 'Raporlar',         icon: 'chart' },
+  { id: 'satis',      label: 'Satış Dashboard',  icon: 'fuel' },
   { id: 'ayarlar',    label: 'Ayarlar',          icon: 'settings' },
 ];
 

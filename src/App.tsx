@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import type { ViewId, ScheduleMode, Employee, Shift, ShiftStatus, ShiftCodeKey, StationName, DepartmentName, RoleName, Station, Department, Role } from './types';
+import type { ViewId, ScheduleMode, Employee, Shift, ShiftStatus, ShiftCodeKey, StationName, DepartmentName, RoleName, Station, Department, Role, SalesImportConfig } from './types';
 import { SHIFT_CODES, WORK_CODES, isWithinEmployment } from './constants';
 import {
   fetchEmployees, fetchShifts,
@@ -8,6 +8,7 @@ import {
   fetchStations, createStation, deleteStation,
   fetchDepartments, createDepartment, deleteDepartment,
   fetchRoles, createRole, deleteRole,
+  fetchSalesConfigs,
 } from './lib/db';
 import { isSupabaseConfigError } from './lib/supabase';
 import { Sidebar, TopbarMobile, ToastStack } from './components/layout/Sidebar';
@@ -15,6 +16,7 @@ import { ScheduleScreen } from './components/schedule/ScheduleScreen';
 import { EmployeesScreen } from './components/employees/EmployeesScreen';
 import { DailyScreen } from './components/daily/DailyScreen';
 import { ReportsScreen } from './components/reports/ReportsScreen';
+import { SalesScreen } from './components/sales/SalesScreen';
 import { SettingsScreen } from './components/settings/SettingsScreen';
 import { ShiftModal } from './components/modals/ShiftModal';
 import { EmployeeModal } from './components/modals/EmployeeModal';
@@ -54,7 +56,7 @@ interface EmployeeFormData {
 
 const DEFAULT_VIEW: ViewId = 'cizelge';
 const DEFAULT_SCHEDULE_MODE: ScheduleMode = 'ay';
-const VIEW_IDS: readonly ViewId[] = ['cizelge', 'personeller', 'gunluk', 'raporlar', 'ayarlar'];
+const VIEW_IDS: readonly ViewId[] = ['cizelge', 'personeller', 'gunluk', 'raporlar', 'ayarlar', 'satis'];
 const SCHEDULE_MODES: readonly ScheduleMode[] = ['hafta', 'ay'];
 
 function isViewId(value: string | null): value is ViewId {
@@ -126,6 +128,7 @@ export default function App() {
   const [roles,       setRoles]       = useState<Role[]>([]);
   const [employees,   setEmployees]   = useState<Employee[]>([]);
   const [shifts,      setShifts]      = useState<Shift[]>([]);
+  const [salesConfigs, setSalesConfigs] = useState<SalesImportConfig[]>([]);
   const [activeMonth, setActiveMonth] = useState<string>(todayYearMonth);
   const [loading,     setLoading]     = useState(true);
   const [loadError,   setLoadError]   = useState<string | null>(null);
@@ -145,14 +148,15 @@ export default function App() {
   useEffect(() => {
     async function load() {
       try {
-        const [sts, depts, rls, emps, shfts] = await Promise.all([
-          fetchStations(), fetchDepartments(), fetchRoles(), fetchEmployees(), fetchShifts(),
+        const [sts, depts, rls, emps, shfts, sconfigs] = await Promise.all([
+          fetchStations(), fetchDepartments(), fetchRoles(), fetchEmployees(), fetchShifts(), fetchSalesConfigs(),
         ]);
         setStations(sts);
         setDepartments(depts);
         setRoles(rls);
         setEmployees(emps);
         setShifts(shfts);
+        setSalesConfigs(sconfigs);
       } catch (err) {
         console.error('Veri yüklenemedi:', err);
         setLoadError(loadErrorMessage(err));
@@ -514,6 +518,17 @@ export default function App() {
           onDeleteDepartment={handleDeleteDepartment}
           onAddRole={handleAddRole}
           onDeleteRole={handleDeleteRole}
+          onToast={toast}
+        />
+      );
+      break;
+    case 'satis':
+      screen = (
+        <SalesScreen
+          stations={stations}
+          departments={departments}
+          salesConfigs={salesConfigs}
+          setSalesConfigs={setSalesConfigs}
           onToast={toast}
         />
       );
