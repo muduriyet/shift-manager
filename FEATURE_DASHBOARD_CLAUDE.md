@@ -143,7 +143,7 @@ değerleri birebir üretiyor — ek karar gerekmiyor.
 - **DoD:** Sol menüden "Satış Dashboard" açılıyor, 3 sekme arası geçiş çalışıyor
   (içerikler placeholder); `npm.cmd run build` temiz.
 
-### [ ] SD-07 — Konfigürasyon sekmesi
+### [x] SD-07 — Konfigürasyon sekmesi
 - **Bağımlılık:** SD-03, SD-06, SD-04 (formül testi)
 - **Kapsam:** `sales/SalesConfigTab.tsx`. Sol: config listesi (durum + system
   işareti). Sağ: ad, sheet adları, mapping tablosu [Hedef/Kaynak/Formül],

@@ -3,6 +3,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import type { Station, Department, SalesImportConfig } from '../../types';
 import { Tabs, type TabItem } from '../ui/Tabs';
 import { EmptyState } from '../ui/EmptyState';
+import { SalesConfigTab } from './SalesConfigTab';
 
 type SalesTab = 'dashboard' | 'import' | 'config';
 
@@ -27,7 +28,7 @@ interface SalesScreenProps {
 
 // SD-06: ekran kabuğu + sekmeler. Sekme içerikleri SD-07 (Konfigürasyon),
 // SD-08 (İçe Aktar) ve SD-11 (Dashboard) ile doldurulacak.
-export function SalesScreen(_props: SalesScreenProps) {
+export function SalesScreen({ salesConfigs, setSalesConfigs, onToast }: SalesScreenProps) {
   const [tab, setTab] = useState<SalesTab>(readStoredSalesTab);
   useEffect(() => { localStorage.setItem('vy_sales_tab', tab); }, [tab]);
 
@@ -60,11 +61,7 @@ export function SalesScreen(_props: SalesScreenProps) {
           />
         )}
         {tab === 'config' && (
-          <EmptyState
-            icon="settings"
-            title="Konfigürasyon"
-            description="Import konfigürasyonlarını (hücre/formül eşlemeleri) buradan yöneteceksiniz."
-          />
+          <SalesConfigTab configs={salesConfigs} setConfigs={setSalesConfigs} onToast={onToast} />
         )}
       </div>
     </div>
