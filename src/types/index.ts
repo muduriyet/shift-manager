@@ -216,6 +216,7 @@ export interface SalesParsedField {
   source: SalesSheetSource;
   formula: string;
   value: number | string | null;
+  error?: string;
 }
 
 // SD-05 buildSalesImportPlan çıktısı; SD-08 preview paneli buradan beslenir.

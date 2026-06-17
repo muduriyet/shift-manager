@@ -119,7 +119,7 @@ değerleri birebir üretiyor — ek karar gerekmiyor.
 - **DoD:** `docs/tmp-analysis/gunluk.xlsx`+`ozet.xls` seed config ile parse →
   doğrulama tablosundaki tüm golden değerler (tarih=2026-05-01 kaymasız) çıkıyor.
 
-### [ ] SD-05 — Import plan/preview mantığı
+### [x] SD-05 — Import plan/preview mantığı
 - **Bağımlılık:** SD-04, SD-03
 - **Kapsam:** `src/lib/salesImport.ts` (şablon: `scheduleImport.ts`).
   `buildSalesImportPlan({ dailyFile, summaryFile, config, scope, prices })`:

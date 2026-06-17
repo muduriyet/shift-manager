@@ -5,7 +5,7 @@
 // sheet referansı (Sayfa1!A1), aralık (A1:A5), metin — hepsi bloklayıcı hata verir.
 
 import type {
-  SalesImportConfig, SalesMappingTarget, SalesSheetSource,
+  SalesImportConfig, SalesMappingTarget, SalesParsedField,
 } from '../types';
 
 // ---- Gösterim etiketleri ve hedef alan kümeleri (UI + validasyon reuse eder) ----
@@ -253,18 +253,10 @@ function pickSheet(
 
 // ---- Ana parse ----
 
-export interface SalesParseFieldResult {
-  target: SalesMappingTarget;
-  source: SalesSheetSource;
-  formula: string;
-  value: number | string | null;
-  error?: string;
-}
-
 export interface SalesParseResult {
   values: Partial<Record<SalesMappingTarget, number>>; // sayısal hedefler
   sourceReportDate: string | null;                     // source_report_date
-  fields: SalesParseFieldResult[];                     // preview gösterimi
+  fields: SalesParsedField[];                          // preview gösterimi
   errors: string[];                                    // bloklayıcılar
 }
 
@@ -279,7 +271,7 @@ const errMsg = (e: unknown): string => (e instanceof Error ? e.message : 'Bilinm
 export async function parseSalesWorkbooks(input: SalesParseInput): Promise<SalesParseResult> {
   const XLSX = await import('xlsx');
   const errors: string[] = [];
-  const fields: SalesParseFieldResult[] = [];
+  const fields: SalesParsedField[] = [];
   const values: Partial<Record<SalesMappingTarget, number>> = {};
   let sourceReportDate: string | null = null;
 
