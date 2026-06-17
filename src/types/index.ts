@@ -97,3 +97,139 @@ export interface NavItem {
   label: string;
   icon: string;
 }
+
+// ---- Satış Dashboard ----
+// NOT: ViewId'a 'satis' SD-06'da (App.tsx case'iyle birlikte) eklenecek.
+
+export type SalesConfigStatus = 'draft' | 'active' | 'inactive';
+
+// Mapping hedef alanları ilk sürümde sabit (kullanıcı yeni metrik ekleyemez).
+export type SalesMappingTarget =
+  | 'source_report_date'
+  | 'gasoline_liters'
+  | 'diesel_liters'
+  | 'lpg_liters'
+  | 'total_sales_tl'
+  | 'card_sales_tl'
+  | 'cash_sales_tl'
+  | 'tts_tl'
+  | 'partner_tl'
+  | 'gift_tl'
+  | 'fault_form_tl'
+  | 'company_tl'
+  | 'alioglu_tl'
+  | 'discount_points_tl';
+
+export type SalesSheetSource = 'daily' | 'summary';
+
+export interface SalesMapping {
+  target: SalesMappingTarget;
+  source: SalesSheetSource;
+  formula: string;        // hücre referansı veya whitelist ifade (ör. "G3", "G16+G17")
+}
+
+export interface SalesImportConfig {
+  id: number;
+  name: string;
+  status: SalesConfigStatus;
+  isSystem: boolean;
+  dailySheetName: string | null;
+  summarySheetName: string | null;
+  mappings: SalesMapping[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Persist edilen günlük rapor satırı (sales_daily_reports).
+export interface SalesDailyReport {
+  id: number;
+  stationId: number;
+  deptId: number;
+  reportDate: string;           // YYYY-MM-DD
+  gasolineLiters: number;
+  dieselLiters: number;
+  lpgLiters: number;
+  totalLiters: number;
+  totalSalesTl: number;
+  discountPointsTl: number;
+  cardSalesTl: number;
+  cashSalesTl: number;
+  ttsTl: number;
+  partnerTl: number;
+  giftTl: number;
+  faultFormTl: number;
+  companyTl: number;
+  aliogluTl: number;
+  dieselUnitPrice: number;
+  gasolineUnitPrice: number;
+  lpgUnitPrice: number;
+  calculatedSalesTl: number;
+  sourceReportDate: string | null;
+  lastImportRunId: number | null;
+}
+
+export interface SalesImportScope {
+  stationId: number;
+  deptId: number;
+  date: string;                 // YYYY-MM-DD
+}
+
+export interface SalesUnitPrices {
+  diesel: number;
+  gasoline: number;
+  lpg: number;
+}
+
+// RPC'ye gönderilecek hesaplanmış değerler (türetilmiş alanlar + birim fiyatlar dahil).
+export interface SalesReportValues {
+  gasolineLiters: number;
+  dieselLiters: number;
+  lpgLiters: number;
+  totalLiters: number;
+  totalSalesTl: number;
+  discountPointsTl: number;
+  cardSalesTl: number;
+  cashSalesTl: number;
+  ttsTl: number;
+  partnerTl: number;
+  giftTl: number;
+  faultFormTl: number;
+  companyTl: number;
+  aliogluTl: number;
+  dieselUnitPrice: number;
+  gasolineUnitPrice: number;
+  lpgUnitPrice: number;
+  calculatedSalesTl: number;
+  sourceReportDate: string | null;
+}
+
+export interface SalesImportApplyResult {
+  reportId: number;
+  runId: number;
+  action: 'insert' | 'update';
+  changedFields: Record<string, { old: unknown; new: unknown }>;
+}
+
+// Parse edilen tek alan (preview gösterimi için).
+export interface SalesParsedField {
+  target: SalesMappingTarget;
+  source: SalesSheetSource;
+  formula: string;
+  value: number | string | null;
+}
+
+// SD-05 buildSalesImportPlan çıktısı; SD-08 preview paneli buradan beslenir.
+export interface SalesImportPlan {
+  scope: SalesImportScope;
+  config: SalesImportConfig;
+  prices: SalesUnitPrices;
+  dailyFileName: string;
+  summaryFileName: string;
+  fields: SalesParsedField[];
+  report: SalesReportValues;
+  existing: SalesDailyReport | null;
+  changedFields: string[];
+  warnings: string[];
+  errors: string[];             // bloklayıcılar
+  canApply: boolean;
+}

@@ -3,6 +3,8 @@ import type {
   Employee, Shift, ShiftCodeKey,
   StationName, DepartmentName, RoleName, ShiftStatus, EmployeeStatus,
   Station, Department, Role,
+  SalesImportConfig, SalesConfigStatus, SalesMapping, SalesDailyReport,
+  SalesImportScope, SalesReportValues, SalesImportApplyResult,
 } from '../types';
 
 const supabase = () => getSupabaseClient();
@@ -292,4 +294,241 @@ export async function updateShiftStatus(id: number, status: ShiftStatus): Promis
 export async function deleteShift(id: number): Promise<void> {
   const { error } = await supabase().from('shifts').delete().eq('id', id);
   if (error) throw error;
+}
+
+// ---- Satış: konfigürasyonlar ----
+
+interface SalesConfigRow {
+  id: number;
+  name: string;
+  status: string;
+  is_system: boolean;
+  daily_sheet_name: string | null;
+  summary_sheet_name: string | null;
+  mappings: SalesMapping[] | null;
+  created_at: string;
+  updated_at: string;
+}
+
+function toSalesConfig(r: SalesConfigRow): SalesImportConfig {
+  return {
+    id: r.id,
+    name: r.name,
+    status: r.status as SalesConfigStatus,
+    isSystem: r.is_system,
+    dailySheetName: r.daily_sheet_name,
+    summarySheetName: r.summary_sheet_name,
+    mappings: Array.isArray(r.mappings) ? r.mappings : [],
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+interface SalesConfigForm {
+  name: string;
+  status: SalesConfigStatus;
+  dailySheetName: string | null;
+  summarySheetName: string | null;
+  mappings: SalesMapping[];
+}
+
+export async function fetchSalesConfigs(): Promise<SalesImportConfig[]> {
+  const { data, error } = await supabase().from('sales_import_configs').select('*').order('id');
+  if (error) throw error;
+  return (data as SalesConfigRow[]).map(toSalesConfig);
+}
+
+export async function createSalesConfig(form: SalesConfigForm): Promise<SalesImportConfig> {
+  const { data, error } = await supabase()
+    .from('sales_import_configs')
+    .insert({
+      name: form.name,
+      status: form.status,
+      is_system: false,
+      daily_sheet_name: form.dailySheetName,
+      summary_sheet_name: form.summarySheetName,
+      mappings: form.mappings,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return toSalesConfig(data as SalesConfigRow);
+}
+
+// System config korumalı: .eq('is_system', false) ile yalnızca kullanıcı config'leri
+// güncellenir; system config hedeflenirse 0 satır döner ve hata fırlar.
+export async function updateSalesConfig(id: number, form: SalesConfigForm): Promise<SalesImportConfig> {
+  const { data, error } = await supabase()
+    .from('sales_import_configs')
+    .update({
+      name: form.name,
+      status: form.status,
+      daily_sheet_name: form.dailySheetName,
+      summary_sheet_name: form.summarySheetName,
+      mappings: form.mappings,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .eq('is_system', false)
+    .select()
+    .single();
+  if (error) throw error;
+  return toSalesConfig(data as SalesConfigRow);
+}
+
+export async function setSalesConfigStatus(id: number, status: SalesConfigStatus): Promise<SalesImportConfig> {
+  const { data, error } = await supabase()
+    .from('sales_import_configs')
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('is_system', false)
+    .select()
+    .single();
+  if (error) throw error;
+  return toSalesConfig(data as SalesConfigRow);
+}
+
+// ---- Satış: günlük raporlar ----
+
+interface SalesReportRow {
+  id: number;
+  station_id: number;
+  dept_id: number;
+  report_date: string;
+  gasoline_liters: number | string;
+  diesel_liters: number | string;
+  lpg_liters: number | string;
+  total_liters: number | string;
+  total_sales_tl: number | string;
+  discount_points_tl: number | string;
+  card_sales_tl: number | string;
+  cash_sales_tl: number | string;
+  tts_tl: number | string;
+  partner_tl: number | string;
+  gift_tl: number | string;
+  fault_form_tl: number | string;
+  company_tl: number | string;
+  alioglu_tl: number | string;
+  diesel_unit_price: number | string;
+  gasoline_unit_price: number | string;
+  lpg_unit_price: number | string;
+  calculated_sales_tl: number | string;
+  source_report_date: string | null;
+  last_import_run_id: number | null;
+}
+
+// Postgres numeric, PostgREST'te string olarak gelebilir → Number'a normalize et.
+const num = (v: number | string): number => (typeof v === 'number' ? v : parseFloat(v));
+
+function toSalesReport(r: SalesReportRow): SalesDailyReport {
+  return {
+    id: r.id,
+    stationId: r.station_id,
+    deptId: r.dept_id,
+    reportDate: r.report_date,
+    gasolineLiters: num(r.gasoline_liters),
+    dieselLiters: num(r.diesel_liters),
+    lpgLiters: num(r.lpg_liters),
+    totalLiters: num(r.total_liters),
+    totalSalesTl: num(r.total_sales_tl),
+    discountPointsTl: num(r.discount_points_tl),
+    cardSalesTl: num(r.card_sales_tl),
+    cashSalesTl: num(r.cash_sales_tl),
+    ttsTl: num(r.tts_tl),
+    partnerTl: num(r.partner_tl),
+    giftTl: num(r.gift_tl),
+    faultFormTl: num(r.fault_form_tl),
+    companyTl: num(r.company_tl),
+    aliogluTl: num(r.alioglu_tl),
+    dieselUnitPrice: num(r.diesel_unit_price),
+    gasolineUnitPrice: num(r.gasoline_unit_price),
+    lpgUnitPrice: num(r.lpg_unit_price),
+    calculatedSalesTl: num(r.calculated_sales_tl),
+    sourceReportDate: r.source_report_date,
+    lastImportRunId: r.last_import_run_id,
+  };
+}
+
+// Belirli scope için mevcut kayıt (import preview'da eski/yeni farkı için).
+export async function fetchSalesReportForScope(
+  stationId: number,
+  deptId: number,
+  date: string,
+): Promise<SalesDailyReport | null> {
+  const { data, error } = await supabase()
+    .from('sales_daily_reports')
+    .select('*')
+    .eq('station_id', stationId)
+    .eq('dept_id', deptId)
+    .eq('report_date', date)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? toSalesReport(data as SalesReportRow) : null;
+}
+
+export async function fetchSalesReports(): Promise<SalesDailyReport[]> {
+  const { data, error } = await supabase()
+    .from('sales_daily_reports')
+    .select('*')
+    .order('report_date');
+  if (error) throw error;
+  return (data as SalesReportRow[]).map(toSalesReport);
+}
+
+// ---- Satış: import uygula (apply_sales_import RPC) ----
+
+export interface SalesImportApplyInput {
+  scope: SalesImportScope;
+  configId: number | null;
+  dailyFileName: string;
+  summaryFileName: string;
+  configSnapshot: unknown;
+  parsedValues: unknown;
+  warnings: string[];
+  report: SalesReportValues;
+}
+
+export async function applySalesImport(input: SalesImportApplyInput): Promise<SalesImportApplyResult> {
+  const r = input.report;
+  const payload = {
+    station_id: input.scope.stationId,
+    dept_id: input.scope.deptId,
+    report_date: input.scope.date,
+    config_id: input.configId,
+    daily_file_name: input.dailyFileName,
+    summary_file_name: input.summaryFileName,
+    config_snapshot: input.configSnapshot,
+    parsed_values: input.parsedValues,
+    warnings: input.warnings,
+    report: {
+      gasoline_liters: r.gasolineLiters,
+      diesel_liters: r.dieselLiters,
+      lpg_liters: r.lpgLiters,
+      total_liters: r.totalLiters,
+      total_sales_tl: r.totalSalesTl,
+      discount_points_tl: r.discountPointsTl,
+      card_sales_tl: r.cardSalesTl,
+      cash_sales_tl: r.cashSalesTl,
+      tts_tl: r.ttsTl,
+      partner_tl: r.partnerTl,
+      gift_tl: r.giftTl,
+      fault_form_tl: r.faultFormTl,
+      company_tl: r.companyTl,
+      alioglu_tl: r.aliogluTl,
+      diesel_unit_price: r.dieselUnitPrice,
+      gasoline_unit_price: r.gasolineUnitPrice,
+      lpg_unit_price: r.lpgUnitPrice,
+      calculated_sales_tl: r.calculatedSalesTl,
+      source_report_date: r.sourceReportDate,
+    },
+  };
+  const { data, error } = await supabase().rpc('apply_sales_import', { payload });
+  if (error) throw error;
+  const res = data as { report_id: number; run_id: number; action: string; changed_fields: Record<string, { old: unknown; new: unknown }> };
+  return {
+    reportId: res.report_id,
+    runId: res.run_id,
+    action: res.action as 'insert' | 'update',
+    changedFields: res.changed_fields ?? {},
+  };
 }

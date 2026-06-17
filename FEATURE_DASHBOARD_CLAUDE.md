@@ -96,7 +96,7 @@ değerleri birebir üretiyor — ek karar gerekmiyor.
 - **DoD:** MCP `execute_sql` ile örnek payload çağrısı insert+update+audit üretiyor;
   ikinci çağrı update + changed_fields diff üretiyor.
 
-### [ ] SD-03 — Tipler + DB erişim katmanı
+### [x] SD-03 — Tipler + DB erişim katmanı
 - **Bağımlılık:** SD-01 (tablolar), SD-02 (rpc)
 - **Kapsam:** `types/index.ts`: `ViewId += 'satis'`; `SalesImportConfig`,
   `SalesConfigStatus`, `SalesMapping`, `SalesDailyReport`, `SalesImportRun`,
@@ -107,7 +107,7 @@ değerleri birebir üretiyor — ek karar gerekmiyor.
 - **Dosyalar:** `src/types/index.ts`, `src/lib/db.ts`.
 - **DoD:** `npm.cmd run build` temiz; fetchSalesConfigs seed config'i döndürüyor.
 
-### [ ] SD-04 — Excel parse + cell-ref reader + formül evaluator
+### [x] SD-04 — Excel parse + cell-ref reader + formül evaluator
 - **Bağımlılık:** SD-03 (tipler)
 - **Kapsam:** `src/lib/salesParse.ts`. `excel.ts` grid desenini kullan
   (`XLSX.read` + `sheet_to_json({header:1})`). Cell-ref reader (`"C16"`→`[row,col]`).
