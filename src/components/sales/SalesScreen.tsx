@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { Station, Department, SalesImportConfig } from '../../types';
 import { Tabs, type TabItem } from '../ui/Tabs';
-import { EmptyState } from '../ui/EmptyState';
 import { SalesConfigTab } from './SalesConfigTab';
 import { SalesImportTab } from './SalesImportTab';
+import { SalesDashboardTab } from './SalesDashboardTab';
 
 type SalesTab = 'dashboard' | 'import' | 'config';
 
@@ -48,11 +48,7 @@ export function SalesScreen({ stations, departments, salesConfigs, setSalesConfi
 
       <div style={{ marginTop: 20 }}>
         {tab === 'dashboard' && (
-          <EmptyState
-            icon="chart"
-            title="Dashboard hazırlanıyor"
-            description="Veri içe aktardıkça KPI kartları ve grafikler burada görünecek."
-          />
+          <SalesDashboardTab stations={stations} departments={departments} onToast={onToast} />
         )}
         {tab === 'import' && (
           <SalesImportTab

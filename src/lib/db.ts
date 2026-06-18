@@ -4,7 +4,7 @@ import type {
   StationName, DepartmentName, RoleName, ShiftStatus, EmployeeStatus,
   Station, Department, Role,
   SalesImportConfig, SalesConfigStatus, SalesMapping, SalesDailyReport,
-  SalesImportScope, SalesReportValues, SalesImportApplyResult,
+  SalesImportScope, SalesReportValues, SalesImportApplyResult, SalesDailyView,
 } from '../types';
 
 const supabase = () => getSupabaseClient();
@@ -473,6 +473,43 @@ export async function fetchSalesReports(): Promise<SalesDailyReport[]> {
     .order('report_date');
   if (error) throw error;
   return (data as SalesReportRow[]).map(toSalesReport);
+}
+
+// ---- Satış: dashboard view ----
+
+interface SalesDailyViewRow {
+  id: number; station_id: number; station_name: string;
+  dept_id: number; dept_name: string; report_date: string; month: string;
+  gasoline_liters: number | string; diesel_liters: number | string; lpg_liters: number | string;
+  total_liters: number | string; total_sales_tl: number | string; card_sales_tl: number | string;
+  cash_sales_tl: number | string; tts_tl: number | string; partner_tl: number | string;
+  gift_tl: number | string; fault_form_tl: number | string; company_tl: number | string;
+  alioglu_tl: number | string; discount_points_tl: number | string; calculated_sales_tl: number | string;
+  card_ratio: number | string; avg_tl_per_liter: number | string;
+}
+
+function toDailyView(r: SalesDailyViewRow): SalesDailyView {
+  return {
+    id: r.id,
+    stationId: r.station_id, stationName: r.station_name,
+    deptId: r.dept_id, deptName: r.dept_name,
+    reportDate: r.report_date, month: r.month,
+    gasolineLiters: num(r.gasoline_liters), dieselLiters: num(r.diesel_liters), lpgLiters: num(r.lpg_liters),
+    totalLiters: num(r.total_liters), totalSalesTl: num(r.total_sales_tl), cardSalesTl: num(r.card_sales_tl),
+    cashSalesTl: num(r.cash_sales_tl), ttsTl: num(r.tts_tl), partnerTl: num(r.partner_tl),
+    giftTl: num(r.gift_tl), faultFormTl: num(r.fault_form_tl), companyTl: num(r.company_tl),
+    aliogluTl: num(r.alioglu_tl), discountPointsTl: num(r.discount_points_tl), calculatedSalesTl: num(r.calculated_sales_tl),
+    cardRatio: num(r.card_ratio), avgTlPerLiter: num(r.avg_tl_per_liter),
+  };
+}
+
+export async function fetchSalesDashboardDaily(): Promise<SalesDailyView[]> {
+  const { data, error } = await supabase()
+    .from('sales_dashboard_daily_view')
+    .select('*')
+    .order('report_date');
+  if (error) throw error;
+  return (data as SalesDailyViewRow[]).map(toDailyView);
 }
 
 // ---- Satış: import uygula (apply_sales_import RPC) ----

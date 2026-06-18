@@ -234,3 +234,31 @@ export interface SalesImportPlan {
   errors: string[];             // bloklayıcılar
   canApply: boolean;
 }
+
+// sales_dashboard_daily_view satırı (dashboard kaynağı).
+export interface SalesDailyView {
+  id: number;
+  stationId: number;
+  stationName: string;
+  deptId: number;
+  deptName: string;
+  reportDate: string;
+  month: string;
+  gasolineLiters: number;
+  dieselLiters: number;
+  lpgLiters: number;
+  totalLiters: number;
+  totalSalesTl: number;
+  cardSalesTl: number;
+  cashSalesTl: number;
+  ttsTl: number;
+  partnerTl: number;
+  giftTl: number;
+  faultFormTl: number;
+  companyTl: number;
+  aliogluTl: number;
+  discountPointsTl: number;
+  calculatedSalesTl: number;
+  cardRatio: number;
+  avgTlPerLiter: number;
+}

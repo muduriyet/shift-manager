@@ -178,14 +178,14 @@ değerleri birebir üretiyor — ek karar gerekmiyor.
 - **DoD:** View'lar import edilen golden satır için KPI'ları doğru döndürüyor
   (Kart Oranı≈0,638, TL/L≈66,30).
 
-### [ ] SD-10 — Native grafik bileşenleri
+### [x] SD-10 — Native grafik bileşenleri
 - **Bağımlılık:** yok (saf bileşen)
 - **Kapsam:** `sales/charts/LineChart.tsx` (`<polyline>`),
   `sales/charts/BarChart.tsx` (`<rect>`); renkler `index.css` token'larından.
 - **Dosyalar:** `src/components/sales/charts/{LineChart,BarChart}.tsx` (yeni).
 - **DoD:** Örnek veriyle render; responsive; `npm.cmd run build` temiz.
 
-### [ ] SD-11 — Dashboard sekmesi
+### [x] SD-11 — Dashboard sekmesi
 - **Bağımlılık:** SD-09, SD-10, SD-06
 - **Kapsam:** `sales/SalesDashboardTab.tsx`. Filtreler (İstasyon/Departman/Ay/
   opsiyonel gün). KPI kartları (`ui/Stat.tsx`) monthly view'dan. Tablolar (günlük
