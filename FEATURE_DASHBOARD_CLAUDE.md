@@ -168,7 +168,7 @@ değerleri birebir üretiyor — ek karar gerekmiyor.
 
 ## Backlog — Faz 2 (dashboard)
 
-### [ ] SD-09 — Dashboard view'ları
+### [x] SD-09 — Dashboard view'ları
 - **Bağımlılık:** SD-01 (+ SD-08 ile veri)
 - **Kapsam:** `sales_dashboard_daily_view` (günlük normalize + satır türetmeleri),
   `sales_dashboard_monthly_view` (`date_trunc('month',report_date)` + station/dept
