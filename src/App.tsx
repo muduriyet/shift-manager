@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import type { ViewId, ScheduleMode, Employee, Shift, ShiftStatus, ShiftCodeKey, StationName, DepartmentName, RoleName, Station, Department, Role, SalesImportConfig } from './types';
 import { SHIFT_CODES, WORK_CODES, isWithinEmployment } from './constants';
 import {
@@ -16,7 +16,6 @@ import { ScheduleScreen } from './components/schedule/ScheduleScreen';
 import { EmployeesScreen } from './components/employees/EmployeesScreen';
 import { DailyScreen } from './components/daily/DailyScreen';
 import { ReportsScreen } from './components/reports/ReportsScreen';
-import { SalesScreen } from './components/sales/SalesScreen';
 import { SettingsScreen } from './components/settings/SettingsScreen';
 import { ShiftModal } from './components/modals/ShiftModal';
 import { EmployeeModal } from './components/modals/EmployeeModal';
@@ -27,6 +26,11 @@ import {
   type ScheduleImportApplyResult,
   type ScheduleImportPlan,
 } from './lib/scheduleImport';
+
+// Satış ekranı (Recharts + tüm satış kodu) yalnızca bu sekmeye girilince yüklenir → ilk paket küçük kalır.
+const SalesScreen = lazy(() =>
+  import('./components/sales/SalesScreen').then(m => ({ default: m.SalesScreen }))
+);
 
 interface ToastItem { id: number; msg: string }
 
@@ -547,7 +551,11 @@ export default function App() {
 
       <div className="main">
         <TopbarMobile onMenuOpen={() => setDrawer(true)} />
-        <div className="content">{screen}</div>
+        <div className="content">
+          <Suspense fallback={
+            <div style={{ display: 'grid', placeItems: 'center', minHeight: 320, color: 'var(--muted-foreground)', fontSize: 13 }}>Yükleniyor…</div>
+          }>{screen}</Suspense>
+        </div>
       </div>
 
       {shiftModalOpen && (

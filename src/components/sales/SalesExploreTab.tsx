@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Station, Department, SalesDailyView } from '../../types';
-import { fetchSalesDashboardDaily } from '../../lib/db';
+import { fetchSalesDashboardDaily, updateSalesReport } from '../../lib/db';
 import {
   SALES_METRICS, ROW_DIMS, COL_DIMS, ALL,
   buildExplore, dataDateRange, formatMetric, compactMetric,
@@ -12,8 +12,9 @@ import { Stat } from '../ui/Stat';
 import { EmptyState } from '../ui/EmptyState';
 import { LineChart } from './charts/LineChart';
 import { BarChart } from './charts/BarChart';
+import { SalesRawGrid } from './SalesRawGrid';
 
-type View = 'line' | 'bar' | 'table';
+type View = 'line' | 'bar' | 'table' | 'raw';
 const SERIES_COLORS = ['#1e3a8a', '#0f766e', '#b45309', '#7c3aed', '#be185d', '#0891b2', '#3b6d11'];
 
 interface SalesExploreTabProps {
@@ -65,6 +66,27 @@ export function SalesExploreTab({ stations, departments, onToast }: SalesExplore
     station, dept, rowDim, colDim, metricKey,
   }), [rows, start, end, station, dept, rowDim, colDim, metricKey]);
 
+  // Ham Tablo modu: buildExplore ile aynı filtre (tarih aralığı + istasyon/departman).
+  const rawRows = useMemo(() => rows.filter(r =>
+    r.reportDate >= (start || '0000-01-01') && r.reportDate <= (end || '9999-12-31') &&
+    (station === ALL || r.stationName === station) &&
+    (dept === ALL || r.deptName === dept),
+  ), [rows, start, end, station, dept]);
+
+  // Inline düzenleme: optimistik güncelle → DB'ye yaz → hata olursa geri al.
+  const saveReportEdit = useCallback(async (next: SalesDailyView) => {
+    const prev = rows.find(r => r.id === next.id);
+    if (!prev) return;
+    setRows(rs => rs.map(r => (r.id === next.id ? next : r)));
+    try {
+      await updateSalesReport(next.id, next);
+    } catch (err) {
+      console.error('Satış kaydı güncellenemedi', err);
+      setRows(rs => rs.map(r => (r.id === next.id ? prev : r)));
+      onToast('Kaydedilemedi, değişiklik geri alındı');
+    }
+  }, [rows, onToast]);
+
   if (loading) {
     return <div style={{ padding: 40, color: 'var(--muted-foreground)' }}>Yükleniyor…</div>;
   }
@@ -92,18 +114,22 @@ export function SalesExploreTab({ stations, departments, onToast }: SalesExplore
     <div>
       {/* Kontroller */}
       <div className="explore-controls">
-        <Field label="Metrik">
-          <Select value={metricKey} onChange={v => setMetricKey(v as MetricKey)} icon="chart"
-            options={SALES_METRICS.map(m => ({ value: m.key, label: m.label }))} />
-        </Field>
-        <Field label="Kırılım (satır)">
-          <Select value={rowDim} onChange={v => setRowDim(v as RowDim)} icon="layers"
-            options={ROW_DIMS.map(d => ({ value: d.key, label: d.label }))} />
-        </Field>
-        <Field label="Pivot kolonu">
-          <Select value={colDim} onChange={v => setColDim(v as ColDim)} icon="grip"
-            options={COL_DIMS.map(d => ({ value: d.key, label: d.label }))} />
-        </Field>
+        {view !== 'raw' && (
+          <>
+            <Field label="Metrik">
+              <Select value={metricKey} onChange={v => setMetricKey(v as MetricKey)} icon="chart"
+                options={SALES_METRICS.map(m => ({ value: m.key, label: m.label }))} />
+            </Field>
+            <Field label="Kırılım (satır)">
+              <Select value={rowDim} onChange={v => setRowDim(v as RowDim)} icon="layers"
+                options={ROW_DIMS.map(d => ({ value: d.key, label: d.label }))} />
+            </Field>
+            <Field label="Pivot kolonu">
+              <Select value={colDim} onChange={v => setColDim(v as ColDim)} icon="grip"
+                options={COL_DIMS.map(d => ({ value: d.key, label: d.label }))} />
+            </Field>
+          </>
+        )}
         <Field label="İstasyon">
           <Select value={station} onChange={v => setStation(String(v))} icon="pin"
             options={[ALL, ...stations.map(s => s.name)].map(s => ({ value: s, label: s === ALL ? 'Tüm İstasyonlar' : s }))} />
@@ -120,27 +146,34 @@ export function SalesExploreTab({ stations, departments, onToast }: SalesExplore
         </Field>
       </div>
 
-      {/* Özet */}
-      <div className="stat-grid">
-        <Stat label={`${result.metric.label} · Genel`} value={formatMetric(result.grandTotal, result.metric)} icon="chart" tone="primary"
-          foot={<span>{result.categories.length} {rowDimLabel.toLowerCase()}</span>} />
-        <Stat label="Ortalama" value={formatMetric(mean, result.metric)} icon="grip" tone="primary" />
-        <Stat label="En yüksek" value={formatMetric(hi, result.metric)} icon="chart" tone="came" />
-        <Stat label="En düşük" value={formatMetric(lo, result.metric)} icon="chart" tone="absent" />
-      </div>
+      {/* Özet (Ham Tablo modunda gizli) */}
+      {view !== 'raw' && (
+        <div className="stat-grid">
+          <Stat label={`${result.metric.label} · Genel`} value={formatMetric(result.grandTotal, result.metric)} icon="chart" tone="primary"
+            foot={<span>{result.categories.length} {rowDimLabel.toLowerCase()}</span>} />
+          <Stat label="Ortalama" value={formatMetric(mean, result.metric)} icon="grip" tone="primary" />
+          <Stat label="En yüksek" value={formatMetric(hi, result.metric)} icon="chart" tone="came" />
+          <Stat label="En düşük" value={formatMetric(lo, result.metric)} icon="chart" tone="absent" />
+        </div>
+      )}
 
       {/* Çıktı */}
       <div className="card">
         <div className="card-head">
-          <h3 className="card-title">{result.metric.label}{result.hasCols ? ` · ${COL_DIMS.find(d => d.key === colDim)?.label}` : ''}</h3>
+          <h3 className="card-title">{view === 'raw'
+            ? 'Ham Veri · sales_dashboard_daily_view'
+            : `${result.metric.label}${result.hasCols ? ` · ${COL_DIMS.find(d => d.key === colDim)?.label}` : ''}`}</h3>
           <div className="segment">
             <button className={view === 'line' ? 'on' : ''} onClick={() => setView('line')}>Çizgi</button>
             <button className={view === 'bar' ? 'on' : ''} onClick={() => setView('bar')}>Bar</button>
-            <button className={view === 'table' ? 'on' : ''} onClick={() => setView('table')}>Tablo</button>
+            <button className={view === 'table' ? 'on' : ''} onClick={() => setView('table')}>Pivot</button>
+            <button className={view === 'raw' ? 'on' : ''} onClick={() => setView('raw')}>Ham Tablo</button>
           </div>
         </div>
         <div className="card-pad">
-          {result.isEmpty ? (
+          {view === 'raw' ? (
+            <SalesRawGrid rows={rawRows} onEdit={saveReportEdit} onToast={onToast} />
+          ) : result.isEmpty ? (
             <div className="chart-empty">Seçili aralıkta veri yok</div>
           ) : view === 'table' ? (
             <div className="table-wrap">

@@ -258,6 +258,9 @@ export interface SalesDailyView {
   companyTl: number;
   aliogluTl: number;
   discountPointsTl: number;
+  dieselUnitPrice: number;
+  gasolineUnitPrice: number;
+  lpgUnitPrice: number;
   calculatedSalesTl: number;
   cardRatio: number;
   avgTlPerLiter: number;

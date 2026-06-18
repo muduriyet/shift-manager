@@ -117,7 +117,7 @@ select
     { "target": "lpg_liters",          "source": "daily",   "formula": "G5" },
     { "target": "total_sales_tl",      "source": "daily",   "formula": "C16" },
     { "target": "card_sales_tl",       "source": "daily",   "formula": "G16+G17" },
-    { "target": "cash_sales_tl",       "source": "daily",   "formula": "C42" },
+    { "target": "cash_sales_tl",       "source": "daily",   "formula": "ARA(\"NAKİT SATIŞ\", A, C)" },
     { "target": "tts_tl",              "source": "daily",   "formula": "C21" },
     { "target": "partner_tl",          "source": "daily",   "formula": "C22" },
     { "target": "gift_tl",             "source": "daily",   "formula": "C23" },

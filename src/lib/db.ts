@@ -484,7 +484,9 @@ interface SalesDailyViewRow {
   total_liters: number | string; total_sales_tl: number | string; card_sales_tl: number | string;
   cash_sales_tl: number | string; tts_tl: number | string; partner_tl: number | string;
   gift_tl: number | string; fault_form_tl: number | string; company_tl: number | string;
-  alioglu_tl: number | string; discount_points_tl: number | string; calculated_sales_tl: number | string;
+  alioglu_tl: number | string; discount_points_tl: number | string;
+  diesel_unit_price: number | string; gasoline_unit_price: number | string; lpg_unit_price: number | string;
+  calculated_sales_tl: number | string;
   card_ratio: number | string; avg_tl_per_liter: number | string;
 }
 
@@ -498,7 +500,9 @@ function toDailyView(r: SalesDailyViewRow): SalesDailyView {
     totalLiters: num(r.total_liters), totalSalesTl: num(r.total_sales_tl), cardSalesTl: num(r.card_sales_tl),
     cashSalesTl: num(r.cash_sales_tl), ttsTl: num(r.tts_tl), partnerTl: num(r.partner_tl),
     giftTl: num(r.gift_tl), faultFormTl: num(r.fault_form_tl), companyTl: num(r.company_tl),
-    aliogluTl: num(r.alioglu_tl), discountPointsTl: num(r.discount_points_tl), calculatedSalesTl: num(r.calculated_sales_tl),
+    aliogluTl: num(r.alioglu_tl), discountPointsTl: num(r.discount_points_tl),
+    dieselUnitPrice: num(r.diesel_unit_price), gasolineUnitPrice: num(r.gasoline_unit_price), lpgUnitPrice: num(r.lpg_unit_price),
+    calculatedSalesTl: num(r.calculated_sales_tl),
     cardRatio: num(r.card_ratio), avgTlPerLiter: num(r.avg_tl_per_liter),
   };
 }
@@ -510,6 +514,23 @@ export async function fetchSalesDashboardDaily(): Promise<SalesDailyView[]> {
     .order('report_date');
   if (error) throw error;
   return (data as SalesDailyViewRow[]).map(toDailyView);
+}
+
+// Veri Gezgini "Ham Tablo" inline düzenlemesi → temel tabloya (view değil) id ile yazar.
+// card_ratio / avg_tl_per_liter view'da türetildiği için yazılmaz; total_liters ve
+// calculated_sales_tl ise saklanan kolonlar olduğundan (import'taki kuralla) yazılır.
+export async function updateSalesReport(id: number, v: SalesDailyView): Promise<void> {
+  const { error } = await supabase()
+    .from('sales_daily_reports')
+    .update({
+      gasoline_liters: v.gasolineLiters, diesel_liters: v.dieselLiters, lpg_liters: v.lpgLiters, total_liters: v.totalLiters,
+      total_sales_tl: v.totalSalesTl, discount_points_tl: v.discountPointsTl, card_sales_tl: v.cardSalesTl, cash_sales_tl: v.cashSalesTl,
+      tts_tl: v.ttsTl, partner_tl: v.partnerTl, gift_tl: v.giftTl, fault_form_tl: v.faultFormTl, company_tl: v.companyTl, alioglu_tl: v.aliogluTl,
+      diesel_unit_price: v.dieselUnitPrice, gasoline_unit_price: v.gasolineUnitPrice, lpg_unit_price: v.lpgUnitPrice, calculated_sales_tl: v.calculatedSalesTl,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id);
+  if (error) throw error;
 }
 
 // ---- Satış: import uygula (apply_sales_import RPC) ----
