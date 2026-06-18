@@ -250,8 +250,12 @@ input, select, textarea { font-family: inherit; }
 .sc-mono { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13px; }
 .sc-ro { color: var(--foreground); font-size: 13px; }
 .sc-req { color: var(--absent-fg); }
-.sc-hint { font-size: 12.5px; color: var(--muted-foreground); margin: 10px 0 0; line-height: 1.6; }
-.sc-hint code { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12px; background: var(--muted); padding: 1px 5px; border-radius: 4px; }
+.sc-formula-help { margin-top: 12px; border: 1px solid var(--border); background: var(--muted); border-radius: var(--radius); padding: 11px 13px; font-size: 12.5px; color: var(--muted-foreground); }
+.sc-fh-title { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--foreground); margin-bottom: 6px; }
+.sc-formula-help ul { margin: 0; padding-left: 16px; line-height: 1.7; }
+.sc-formula-help li { margin: 2px 0; }
+.sc-fh-note { margin-top: 7px; }
+.sc-formula-help code { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12px; background: var(--surface); padding: 1px 5px; border-radius: 4px; border: 1px solid var(--border); }
 .sc-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
 .sc-test { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 16px; }
 .sc-test-head h4 { margin: 0; font-size: 14px; font-weight: 650; }

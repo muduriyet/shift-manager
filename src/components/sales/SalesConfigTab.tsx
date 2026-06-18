@@ -324,12 +324,23 @@ export function SalesConfigTab({ configs, setConfigs, onToast }: SalesConfigTabP
           </table>
         </div>
 
-        <p className="sc-hint">
-          <b>Formül:</b> hücre (<code>G3</code>), aritmetik (<code>G16+G17</code>) veya{' '}
-          <code>{'ARA("etiket", KOL)'}</code> — Özet'te <b>B</b> sütununda etiketi içeren satırı bulup{' '}
-          <b>KOL</b> kolonundaki değeri alır. Örnek:{' '}
-          <code>{'ARA("Genel Toplam", H) + ARA("Genel Toplam", I)'}</code>
-        </p>
+        <div className="sc-formula-help">
+          <div className="sc-fh-title"><Icon name="alertCircle" size={14} /> Kullanabileceğin formüller</div>
+          <ul>
+            <li><code>G3</code> — tek hücre değeri (eşlemenin <b>Kaynak</b> sayfasından okunur)</li>
+            <li><code>+ - * / ( )</code> — aritmetik ve parantez, ör. <code>G16+G17</code>, <code>(C16-C17)*2</code></li>
+            <li>
+              <code>{'ARA("etiket", KOL)'}</code> — eşlemenin <b>Kaynak</b> sayfasında (Günlük/Özet)
+              <b> yalnızca B sütununda</b> “etiket”i içeren satırı bulur, o satırın <b>KOL</b> kolonundaki
+              değeri döndürür. Arama hep B'de yapılır; sadece okunacak kolon değişir.
+              <br />Örn: <code>{'ARA("Genel Toplam", H) + ARA("Genel Toplam", I)'}</code>
+            </li>
+          </ul>
+          <div className="sc-fh-note">
+            Desteklenmez: <code>SUM</code>, <code>IF</code> ve diğer Excel fonksiyonları, hücre aralığı
+            (<code>A1:A5</code>), sayfa referansı (<code>Sayfa1!A1</code>).
+          </div>
+        </div>
 
         {!readOnly && issues.length > 0 && (
           <div className="sc-msg sc-msg-warn" style={{ marginTop: 14 }}>
