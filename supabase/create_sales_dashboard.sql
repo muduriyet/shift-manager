@@ -139,6 +139,7 @@ where not exists (
 create or replace function apply_sales_import(payload jsonb)
 returns jsonb
 language plpgsql
+set search_path = public, pg_temp
 as $$
 declare
   v_station_id  integer := (payload->>'station_id')::integer;

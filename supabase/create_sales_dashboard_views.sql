@@ -5,7 +5,8 @@
 -- ============================================================
 
 -- ---- Günlük normalize view (satır bazında türetmeler) ----
-create or replace view sales_dashboard_daily_view as
+-- security_invoker: view sorgulayan rolün izinleriyle çalışır (definer değil).
+create or replace view sales_dashboard_daily_view with (security_invoker = true) as
 select
   r.id,
   r.station_id,
@@ -39,7 +40,7 @@ join stations s    on s.id = r.station_id
 join departments d on d.id = r.dept_id;
 
 -- ---- Aylık KPI view (ay + istasyon + departman bazında toplamlar) ----
-create or replace view sales_dashboard_monthly_view as
+create or replace view sales_dashboard_monthly_view with (security_invoker = true) as
 select
   (date_trunc('month', r.report_date))::date as month,
   r.station_id,
