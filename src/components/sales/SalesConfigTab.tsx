@@ -331,9 +331,10 @@ export function SalesConfigTab({ configs, setConfigs, onToast }: SalesConfigTabP
             <li><code>+ - * / ( )</code> — aritmetik ve parantez, ör. <code>G16+G17</code>, <code>(C16-C17)*2</code></li>
             <li>
               <code>{'ARA("etiket", KOL)'}</code> — eşlemenin <b>Kaynak</b> sayfasında (Günlük/Özet)
-              <b> yalnızca B sütununda</b> “etiket”i içeren satırı bulur, o satırın <b>KOL</b> kolonundaki
-              değeri döndürür. Arama hep B'de yapılır; sadece okunacak kolon değişir.
-              <br />Örn: <code>{'ARA("Genel Toplam", H) + ARA("Genel Toplam", I)'}</code>
+              <b> B sütununda</b> “etiket”i içeren satırı bulur, o satırın <b>KOL</b> kolonundaki değeri döndürür.
+              <br />
+              <code>{'ARA("etiket", ARAMA, KOL)'}</code> — aramayı <b>ARAMA</b> kolonunda yapar (B yerine istediğin kolonda).
+              <br />Örn: <code>{'ARA("Genel Toplam", H) + ARA("Genel Toplam", I)'}</code> veya <code>{'ARA("Toplam", C, F)'}</code>
             </li>
           </ul>
           <div className="sc-fh-note">
