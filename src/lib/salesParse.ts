@@ -1,8 +1,10 @@
 // Satış import Excel parse + whitelist formül evaluator (SD-04).
 // Günlük + Özet dosyalarını config mapping'ine göre okur.
-// Mapping kaynağı: hücre referansı (ör. "G3") veya basit aritmetik (ör. "G16+G17", "N26+O26").
-// Desteklenen: hücre ref, sayı, + - * /, parantez. Desteklenmeyen: SUM/IF/Excel fonksiyonu,
-// sheet referansı (Sayfa1!A1), aralık (A1:A5), metin — hepsi bloklayıcı hata verir.
+// Mapping kaynağı: hücre referansı (ör. "G3"), basit aritmetik (ör. "G16+G17") veya
+// ARA("etiket", KOL) — B sütununda etiketi içeren satırı bulup KOL kolonundaki değeri alır
+// (ör. ARA("Genel Toplam", H) + ARA("Genel Toplam", I)).
+// Desteklenen: hücre ref, sayı, + - * /, parantez, ARA(). Desteklenmeyen: SUM/IF/diğer Excel
+// fonksiyonları, sheet referansı (Sayfa1!A1), aralık (A1:A5) — hepsi bloklayıcı hata verir.
 
 import type {
   SalesImportConfig, SalesMappingTarget, SalesParsedField,
@@ -46,10 +48,12 @@ export const SALES_REQUIRED_TARGETS: SalesMappingTarget[] = SALES_MAPPABLE_TARGE
 
 type Token =
   | { kind: 'num'; value: number }
-  | { kind: 'cell'; ref: string }
+  | { kind: 'word'; text: string }
+  | { kind: 'str'; value: string }
   | { kind: 'op'; value: '+' | '-' | '*' | '/' }
   | { kind: 'lparen' }
-  | { kind: 'rparen' };
+  | { kind: 'rparen' }
+  | { kind: 'comma' };
 
 const CELL_RE = /^[A-Za-z]+[0-9]+$/;
 
@@ -63,6 +67,15 @@ function tokenize(input: string): Token[] {
     if (c === '+' || c === '-' || c === '*' || c === '/') { tokens.push({ kind: 'op', value: c }); i++; continue; }
     if (c === '(') { tokens.push({ kind: 'lparen' }); i++; continue; }
     if (c === ')') { tokens.push({ kind: 'rparen' }); i++; continue; }
+    if (c === ',' || c === ';') { tokens.push({ kind: 'comma' }); i++; continue; }
+    if (c === '"') {
+      let j = i + 1;
+      while (j < s.length && s[j] !== '"') j++;
+      if (j >= s.length) throw new Error('Kapanmayan tırnak işareti');
+      tokens.push({ kind: 'str', value: s.slice(i + 1, j) });
+      i = j + 1;
+      continue;
+    }
     if (/[0-9.]/.test(c)) {
       let j = i + 1;
       while (j < s.length && /[0-9.]/.test(s[j])) j++;
@@ -76,11 +89,7 @@ function tokenize(input: string): Token[] {
     if (/[A-Za-z]/.test(c)) {
       let j = i + 1;
       while (j < s.length && /[A-Za-z0-9]/.test(s[j])) j++;
-      const word = s.slice(i, j);
-      if (!CELL_RE.test(word)) {
-        throw new Error(`Desteklenmeyen ifade: "${word}" (yalnızca hücre referansı, sayı ve + - * / ( ) kullanılabilir)`);
-      }
-      tokens.push({ kind: 'cell', ref: word.toUpperCase() });
+      tokens.push({ kind: 'word', text: s.slice(i, j) });
       i = j;
       continue;
     }
@@ -92,6 +101,7 @@ function tokenize(input: string): Token[] {
 type Ast =
   | { type: 'num'; value: number }
   | { type: 'cell'; ref: string }
+  | { type: 'lookup'; label: string; col: string }
   | { type: 'neg'; operand: Ast }
   | { type: 'bin'; op: '+' | '-' | '*' | '/'; left: Ast; right: Ast };
 
@@ -131,7 +141,30 @@ function parse(tokens: Token[]): Ast {
       return t.value === '-' ? { type: 'neg', operand } : operand;
     }
     if (t.kind === 'num') { consume(); return { type: 'num', value: t.value }; }
-    if (t.kind === 'cell') { consume(); return { type: 'cell', ref: t.ref }; }
+    if (t.kind === 'word') {
+      consume();
+      const nxt = peek();
+      if (nxt && nxt.kind === 'lparen') {
+        const fn = t.text.toUpperCase();
+        if (fn !== 'ARA') throw new Error(`Desteklenmeyen fonksiyon: "${t.text}" (yalnızca ARA)`);
+        consume(); // (
+        const labelTok = peek();
+        if (!labelTok || labelTok.kind !== 'str') throw new Error('ARA: 1. argüman metin olmalı, ör. ARA("Genel Toplam", H)');
+        consume();
+        const sep = peek();
+        if (!sep || sep.kind !== 'comma') throw new Error('ARA: argümanlar virgül (veya ;) ile ayrılmalı');
+        consume();
+        const colTok = peek();
+        if (!colTok || colTok.kind !== 'word' || !/^[A-Za-z]+$/.test(colTok.text)) throw new Error('ARA: 2. argüman sütun harfi olmalı, ör. H');
+        consume();
+        const close = peek();
+        if (!close || close.kind !== 'rparen') throw new Error('ARA: kapanmayan parantez');
+        consume();
+        return { type: 'lookup', label: labelTok.value, col: colTok.text.toUpperCase() };
+      }
+      if (CELL_RE.test(t.text)) return { type: 'cell', ref: t.text.toUpperCase() };
+      throw new Error(`Desteklenmeyen ifade: "${t.text}" (hücre ref, sayı, + - * / ( ) veya ARA("etiket", H))`);
+    }
     if (t.kind === 'lparen') {
       consume();
       const inner = parseExpression();
@@ -149,14 +182,20 @@ function parse(tokens: Token[]): Ast {
   return ast;
 }
 
-function evalAst(ast: Ast, resolveCell: (ref: string) => number): number {
+export interface FormulaCtx {
+  cell: (ref: string) => number;
+  lookup: (label: string, col: string) => number;
+}
+
+function evalAst(ast: Ast, ctx: FormulaCtx): number {
   switch (ast.type) {
     case 'num': return ast.value;
-    case 'cell': return resolveCell(ast.ref);
-    case 'neg': return -evalAst(ast.operand, resolveCell);
+    case 'cell': return ctx.cell(ast.ref);
+    case 'lookup': return ctx.lookup(ast.label, ast.col);
+    case 'neg': return -evalAst(ast.operand, ctx);
     case 'bin': {
-      const l = evalAst(ast.left, resolveCell);
-      const r = evalAst(ast.right, resolveCell);
+      const l = evalAst(ast.left, ctx);
+      const r = evalAst(ast.right, ctx);
       switch (ast.op) {
         case '+': return l + r;
         case '-': return l - r;
@@ -180,8 +219,8 @@ export function validateFormula(formula: string): string | null {
   }
 }
 
-export function evaluateFormula(formula: string, resolveCell: (ref: string) => number): number {
-  return evalAst(parse(tokenize(formula)), resolveCell);
+export function evaluateFormula(formula: string, ctx: FormulaCtx): number {
+  return evalAst(parse(tokenize(formula)), ctx);
 }
 
 // ---- Hücre okuma ----
@@ -212,6 +251,25 @@ function cellNumber(ws: unknown, ref: string): number {
   const n = Number(String(cell.v).trim());
   if (!Number.isFinite(n)) throw new Error(`Hücre sayıya çevrilemedi: ${ref} ("${String(cell.v)}")`);
   return n;
+}
+
+const normLabel = (s: string): string => s.toLocaleLowerCase('tr-TR').replace(/\s+/g, ' ').trim();
+
+// ARA("etiket", KOL): B sütununda etiketi İÇEREN ilk satırı bul, o satırın KOL kolonundaki
+// sayıyı döndür. Sabit hücre yerine etikete tutturulduğu için satırlar kaysa da bozulmaz.
+function lookupValue(XLSX: typeof import('xlsx'), ws: unknown, label: string, col: string): number {
+  const ref = (ws as Record<string, unknown>)['!ref'] as string | undefined;
+  if (!ref) throw new Error('Özet sayfası boş, ARA çalışmadı');
+  const range = XLSX.utils.decode_range(ref);
+  const target = normLabel(label);
+  for (let r = range.s.r; r <= range.e.r; r++) {
+    const bCell = cellOf(ws, 'B' + (r + 1));
+    if (bCell && bCell.v !== undefined && bCell.v !== null && bCell.v !== '' &&
+        normLabel(String(bCell.v)).includes(target)) {
+      return cellNumber(ws, col + (r + 1));
+    }
+  }
+  throw new Error(`"${label}" satırı bulunamadı (B sütununda)`);
 }
 
 const pad2 = (n: number): string => String(n).padStart(2, '0');
@@ -293,7 +351,10 @@ export async function parseSalesWorkbooks(input: SalesParseInput): Promise<Sales
         sourceReportDate = readDateCell(ws, m.formula);
         fields.push({ target: m.target, source: m.source, formula: m.formula, value: sourceReportDate });
       } else {
-        const v = evaluateFormula(m.formula, ref => cellNumber(ws, ref));
+        const v = evaluateFormula(m.formula, {
+          cell: ref => cellNumber(ws, ref),
+          lookup: (lbl, c) => lookupValue(XLSX, ws, lbl, c),
+        });
         if (!Number.isFinite(v)) throw new Error('Hesaplanan değer geçersiz');
         values[m.target] = v;
         fields.push({ target: m.target, source: m.source, formula: m.formula, value: v });

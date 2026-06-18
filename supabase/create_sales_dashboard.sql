@@ -124,7 +124,7 @@ select
     { "target": "fault_form_tl",       "source": "daily",   "formula": "C24" },
     { "target": "company_tl",          "source": "daily",   "formula": "C25" },
     { "target": "alioglu_tl",          "source": "daily",   "formula": "C26" },
-    { "target": "discount_points_tl",  "source": "summary", "formula": "N26+O26" }
+    { "target": "discount_points_tl",  "source": "summary", "formula": "ARA(\"Genel Toplam\", H) + ARA(\"Genel Toplam\", I)" }
   ]'::jsonb
 where not exists (
   select 1 from sales_import_configs where name = 'Standart Akaryakıt' and is_system = true
