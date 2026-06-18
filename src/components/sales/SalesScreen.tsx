@@ -4,6 +4,7 @@ import type { Station, Department, SalesImportConfig } from '../../types';
 import { Tabs, type TabItem } from '../ui/Tabs';
 import { EmptyState } from '../ui/EmptyState';
 import { SalesConfigTab } from './SalesConfigTab';
+import { SalesImportTab } from './SalesImportTab';
 
 type SalesTab = 'dashboard' | 'import' | 'config';
 
@@ -28,7 +29,7 @@ interface SalesScreenProps {
 
 // SD-06: ekran kabuğu + sekmeler. Sekme içerikleri SD-07 (Konfigürasyon),
 // SD-08 (İçe Aktar) ve SD-11 (Dashboard) ile doldurulacak.
-export function SalesScreen({ salesConfigs, setSalesConfigs, onToast }: SalesScreenProps) {
+export function SalesScreen({ stations, departments, salesConfigs, setSalesConfigs, onToast }: SalesScreenProps) {
   const [tab, setTab] = useState<SalesTab>(readStoredSalesTab);
   useEffect(() => { localStorage.setItem('vy_sales_tab', tab); }, [tab]);
 
@@ -54,10 +55,11 @@ export function SalesScreen({ salesConfigs, setSalesConfigs, onToast }: SalesScr
           />
         )}
         {tab === 'import' && (
-          <EmptyState
-            icon="inbox"
-            title="İçe Aktarma"
-            description="Günlük ve özet Excel dosyalarını buradan yükleyip önizleyeceksiniz."
+          <SalesImportTab
+            stations={stations}
+            departments={departments}
+            salesConfigs={salesConfigs}
+            onToast={onToast}
           />
         )}
         {tab === 'config' && (

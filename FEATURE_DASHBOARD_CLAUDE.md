@@ -154,7 +154,7 @@ değerleri birebir üretiyor — ek karar gerekmiyor.
 - **DoD:** Seed config görünür/kopyalanabilir; yeni config kaydet/aktive et; geçersiz
   config aktive edilemiyor; "Dosyayla Test Et" golden dosyada değerleri gösteriyor.
 
-### [ ] SD-08 — İçe Aktar sekmesi (uçtan uca)
+### [x] SD-08 — İçe Aktar sekmesi (uçtan uca)
 - **Bağımlılık:** SD-05, SD-02, SD-06, SD-07
 - **Kapsam:** `sales/SalesImportTab.tsx` (`ScheduleImportModal` UX'i tam sekme).
   İstasyon/Departman/Tarih (`Select`, station→dept filtre), aktif config dropdown,
