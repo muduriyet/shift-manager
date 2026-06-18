@@ -324,6 +324,13 @@ export function SalesConfigTab({ configs, setConfigs, onToast }: SalesConfigTabP
           </table>
         </div>
 
+        <p className="sc-hint">
+          <b>Formül:</b> hücre (<code>G3</code>), aritmetik (<code>G16+G17</code>) veya{' '}
+          <code>{'ARA("etiket", KOL)'}</code> — Özet'te <b>B</b> sütununda etiketi içeren satırı bulup{' '}
+          <b>KOL</b> kolonundaki değeri alır. Örnek:{' '}
+          <code>{'ARA("Genel Toplam", H) + ARA("Genel Toplam", I)'}</code>
+        </p>
+
         {!readOnly && issues.length > 0 && (
           <div className="sc-msg sc-msg-warn" style={{ marginTop: 14 }}>
             <Icon name="alertCircle" size={15} />
