@@ -296,6 +296,10 @@ input, select, textarea { font-family: inherit; }
   .sales-tables { grid-template-columns: 1fr; }
 }
 
+/* ---- veri gezgini ---- */
+.explore-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.explore-controls .select, .explore-controls .select-trigger, .explore-controls .input { width: 100%; }
+
 .weekpick { display: inline-flex; align-items: center; gap: 2px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 3px; }
 .weekpick .lbl { padding: 0 12px; font-weight: 600; font-size: 13.5px; white-space: nowrap; }
 

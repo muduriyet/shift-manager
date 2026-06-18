@@ -26,6 +26,7 @@ export function BarChart({ data, height = 220, valueFormat = n => String(n) }: B
 
   const cx = (i: number) => padL + slot * (i + 0.5);
   const barH = (v: number) => (v / maxV) * innerH;
+  const labelStep = Math.max(1, Math.ceil(n / 14)); // çok bar varsa etiketleri seyrelt
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" preserveAspectRatio="xMidYMid meet" className="chart" role="img">
@@ -44,7 +45,9 @@ export function BarChart({ data, height = 220, valueFormat = n => String(n) }: B
               fill={d.color ?? 'var(--primary)'}
             />
             <text x={cx(i)} y={yTop - 5} textAnchor="middle" className="chart-axis">{valueFormat(d.value)}</text>
-            <text x={cx(i)} y={H - 12} textAnchor="middle" className="chart-axis">{d.label}</text>
+            {(i % labelStep === 0 || i === data.length - 1) && (
+              <text x={cx(i)} y={H - 12} textAnchor="middle" className="chart-axis">{d.label}</text>
+            )}
           </g>
         );
       })}

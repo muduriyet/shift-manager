@@ -5,18 +5,20 @@ import { Tabs, type TabItem } from '../ui/Tabs';
 import { SalesConfigTab } from './SalesConfigTab';
 import { SalesImportTab } from './SalesImportTab';
 import { SalesDashboardTab } from './SalesDashboardTab';
+import { SalesExploreTab } from './SalesExploreTab';
 
-type SalesTab = 'dashboard' | 'import' | 'config';
+type SalesTab = 'dashboard' | 'import' | 'config' | 'explore';
 
 const SALES_TABS: TabItem[] = [
   { id: 'dashboard', label: 'Dashboard',     icon: 'chart' },
   { id: 'import',    label: 'İçe Aktar',     icon: 'inbox' },
   { id: 'config',    label: 'Konfigürasyon', icon: 'settings' },
+  { id: 'explore',   label: 'Veri Gezgini',  icon: 'search' },
 ];
 
 function readStoredSalesTab(): SalesTab {
   const v = localStorage.getItem('vy_sales_tab');
-  return v === 'import' || v === 'config' || v === 'dashboard' ? v : 'dashboard';
+  return v === 'import' || v === 'config' || v === 'dashboard' || v === 'explore' ? v : 'dashboard';
 }
 
 interface SalesScreenProps {
@@ -60,6 +62,9 @@ export function SalesScreen({ stations, departments, salesConfigs, setSalesConfi
         )}
         {tab === 'config' && (
           <SalesConfigTab configs={salesConfigs} setConfigs={setSalesConfigs} onToast={onToast} />
+        )}
+        {tab === 'explore' && (
+          <SalesExploreTab stations={stations} departments={departments} onToast={onToast} />
         )}
       </div>
     </div>

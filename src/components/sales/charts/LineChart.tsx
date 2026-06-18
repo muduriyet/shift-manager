@@ -28,6 +28,7 @@ export function LineChart({ labels, series, height = 220, yFormat = n => String(
   const y = (v: number) => padT + innerH - (v / maxV) * innerH;
 
   const showLegend = series.length > 1;
+  const labelStep = Math.max(1, Math.ceil(n / 12)); // çok nokta varsa x etiketlerini seyrelt
 
   return (
     <div>
@@ -49,9 +50,9 @@ export function LineChart({ labels, series, height = 220, yFormat = n => String(
             </g>
           );
         })}
-        {labels.map((lb, i) => (
+        {labels.map((lb, i) => (i % labelStep === 0 || i === n - 1) ? (
           <text key={i} x={x(i)} y={H - 10} textAnchor="middle" className="chart-axis">{lb}</text>
-        ))}
+        ) : null)}
         {series.map(s => (
           <g key={s.name}>
             {n > 1 && (
