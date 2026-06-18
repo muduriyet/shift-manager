@@ -220,3 +220,43 @@ değerleri birebir üretiyor — ek karar gerekmiyor.
   formül / eksik fiyat / eksik dosya) engellenir.
 - Faz 2 kabul: view'lar beklenen aylık/günlük KPI'ları döndürür; dashboard
   kartları/tabloları/grafikleri DB değerleriyle eşleşir; mockup ile görsel uyum.
+
+---
+
+## İyileştirme
+
+Uçtan uca inceleme (2026-06-18) sonrası açık maddeler. Fonksiyonel hata
+bulunmadı; aşağıdakiler gözlem/iyileştirme niteliğinde.
+
+İnceleme sırasında **düzeltilenler** (commit `553b4ae`):
+- ✅ View'larda `security_invoker = true` (advisor: security_definer_view)
+- ✅ `apply_sales_import` → `set search_path = public, pg_temp` (advisor: function_search_path_mutable)
+
+### [ ] IMP-01 — Dashboard "opsiyonel gün seçimi" filtresi
+Doc filtre listesi İstasyon/Departman/Ay/**opsiyonel gün** içeriyor; gün filtresi
+eklenmedi. `SalesDashboardTab`'a ay içi gün seçimi (Tümü + günler) eklenmeli.
+
+### [ ] IMP-02 — Production için RLS
+Tüm tablolarda (8 tablo) RLS kapalı — anon key ile herkes okur/yazar. Prod öncesi
+`enable row level security` + auth'a uygun policy. (Plan kapsamı dışıydı.)
+
+### [ ] IMP-03 — Boş hücre uyarısı
+`salesParse.cellNumber` boş hücreyi 0 kabul eder (Excel semantiği). Zorunlu bir
+alanın hücresi boşsa hata yerine sessizce 0 olur; zorunlu alanlar için "hücre boş"
+uyarısı eklenebilir.
+
+### [ ] IMP-04 — monthly_view kullanımı
+`sales_dashboard_monthly_view` FE'de kullanılmıyor (KPI'lar daily view'dan
+client-side toplanıyor). Ya monthly view'a geçilir ya da raporlama için bırakılır.
+
+### [ ] IMP-05 — parsePrice binlik ayraç
+`salesImport.parsePrice` `1.234,56` gibi binlik ayraçlı girdiyi çözmez (sadece tek
+virgülü noktaya çevirir). Fiyatlar küçük olduğu için düşük öncelik.
+
+### [ ] IMP-06 — Config Kaydet sonrası test durumu
+Kaydet sonrası `configs` değişince effect seçili test dosyalarını/sonucunu temizler
+(kozmetik). Test state'i `selectedId` değişimine bağlanabilir.
+
+### [ ] IMP-07 — Dashboard server-side filtre (ölçek)
+Dashboard tüm `daily_view` satırlarını çekip client-side filtreliyor (mevcut app
+deseniyle tutarlı). Veri büyürse server-side filtre/sayfalama düşünülebilir.
