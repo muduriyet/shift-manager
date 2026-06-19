@@ -1,0 +1,32 @@
+{
+  "pkg": "shift-manager",
+  "globalName": "ShiftManagerUI",
+  "shape": "package",
+  "projectId": "82cf4abd-0b46-43f5-9291-9485e2b4167f",
+  "entry": "./.design-sync/ds-entry.ts",
+  "srcDir": "src/components/ui",
+  "cssEntry": "src/index.css",
+  "extraFonts": ".design-sync/fonts/inter.css",
+  "readmeHeader": ".design-sync/conventions.md",
+  "componentSrcMap": {
+    "Avatar": "src/components/ui/Avatar.tsx",
+    "Badge": "src/components/ui/Badge.tsx",
+    "Button": "src/components/ui/Button.tsx",
+    "Dialog": "src/components/ui/Dialog.tsx",
+    "DropdownButton": "src/components/ui/DropdownButton.tsx",
+    "EmptyState": "src/components/ui/EmptyState.tsx",
+    "Field": "src/components/ui/Field.tsx",
+    "Input": "src/components/ui/Field.tsx",
+    "Textarea": "src/components/ui/Field.tsx",
+    "SearchInput": "src/components/ui/Field.tsx",
+    "Icon": "src/components/ui/Icon.tsx",
+    "Select": "src/components/ui/Select.tsx",
+    "Stat": "src/components/ui/Stat.tsx",
+    "Tabs": "src/components/ui/Tabs.tsx"
+  },
+  "overrides": {
+    "Dialog": { "cardMode": "single", "viewport": "540x520" },
+    "Icon": { "cardMode": "column" },
+    "Stat": { "cardMode": "column" }
+  }
+}
