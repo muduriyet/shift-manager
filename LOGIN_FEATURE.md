@@ -7,9 +7,8 @@ Durum: **Faz 1 tamam** (client kodu yazıldı + yerelde doğrulandı) · **Faz 2
 - ✅ Faz 1: `supabase.ts` auth helper'ları, `LoginScreen.tsx` (tasarımdan port), `App.tsx` session
   gate, `Sidebar.tsx` çıkış, `schema.sql` RLS bloğu (yazıldı, canlıya UYGULANMADI). Tip kontrolü
   temiz; yerelde doğrulandı (login render, boş-alan hataları, yanlış kimlik → genel hata, Göster/Gizle).
-- ⏳ **Watermark görseli:** `public/coskun-petrol-watermark.png` henüz yok. DesignSync `get_file`
-  256 KiB sınırını aştığı için otomatik çekilemedi; dosyanın elle `public/`'e konması gerekiyor
-  (kod `onError` ile yokken gizliyor, kırılmıyor).
+- ✅ **Watermark görseli:** `public/coskun-petrol-watermark.png` eklendi (şeffaf zeminli beyaz logo).
+  Mavi gradient üstünde yerelde doğrulandı. (Not: 314 KB / 1448×1086 — istenirse sonradan küçültülebilir.)
 - ⏳ Faz 2: kullanıcı oluştur (Auto Confirm!) → deploy → canlı RLS'i Supabase MCP ile aç → doğrula.
 
 Bu dosya, dağıtımdaki (Vercel) uygulamaya kullanıcı adı + parola ile giriş özelliği eklenmesinin
