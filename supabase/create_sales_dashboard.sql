@@ -99,10 +99,21 @@ create index if not exists sales_import_runs_config_id_idx
   on sales_import_runs(config_id);
 
 -- ---- Row Level Security ----
--- Mevcut projeyle tutarlı: geliştirme aşamasında kapalı. Production'da auth + policy ekleyin.
-alter table sales_import_configs disable row level security;
-alter table sales_daily_reports  disable row level security;
-alter table sales_import_runs    disable row level security;
+-- Auth eklendi: yalnızca giriş yapmış (authenticated) kullanıcılar erişebilir.
+-- schema.sql'deki çekirdek tablolarla aynı desen; idempotent (drop-if-exists).
+-- ⚠️ Canlıya kullanıcılar oluşturulduktan SONRA uygulanır (Faz 2).
+alter table sales_import_configs enable row level security;
+alter table sales_daily_reports  enable row level security;
+alter table sales_import_runs    enable row level security;
+
+drop policy if exists "Authenticated full access" on sales_import_configs;
+create policy "Authenticated full access" on sales_import_configs for all to authenticated using (true) with check (true);
+
+drop policy if exists "Authenticated full access" on sales_daily_reports;
+create policy "Authenticated full access" on sales_daily_reports  for all to authenticated using (true) with check (true);
+
+drop policy if exists "Authenticated full access" on sales_import_runs;
+create policy "Authenticated full access" on sales_import_runs    for all to authenticated using (true) with check (true);
 
 -- ---- Seed system config (idempotent) ----
 -- Hücre referansları docs/tmp-analysis golden dosyalarına karşı doğrulandı.

@@ -87,14 +87,31 @@ create unique index if not exists shifts_emp_id_shift_date_unique
   where shift_date is not null and shift_date <> '';
 
 -- ---- Row Level Security ----
--- Geliştirme aşaması için kapalı. Production'da auth ekleyip açın.
-alter table stations    disable row level security;
-alter table departments disable row level security;
-alter table roles       disable row level security;
-alter table employees   disable row level security;
-alter table shifts      disable row level security;
+-- Auth eklendi: yalnızca giriş yapmış (authenticated) kullanıcılar erişebilir.
+-- Giriş yapmamış (anon) istekler 0 satır alır / yazamaz. Politika izin verici
+-- (her authenticated kullanıcı her şeyi yapabilir); şube/departman bazlı ince
+-- taneli kısıtlama sonraki işe (branch-department mimarisi) bırakıldı.
+--
+-- ⚠️ Bu blok canlı DB'ye, kullanıcılar oluşturulduktan SONRA uygulanır (Faz 2).
+-- Önce kullanıcı yokken açılırsa uygulama herkes için "boş" görünür.
+-- drop policy if exists → dosya idempotent kalır (yeniden çalıştırılabilir).
+alter table stations    enable row level security;
+alter table departments enable row level security;
+alter table roles       enable row level security;
+alter table employees   enable row level security;
+alter table shifts      enable row level security;
 
--- Production için örnek açık politika:
--- alter table employees enable row level security;
--- create policy "Authenticated users" on employees for all to authenticated using (true) with check (true);
--- (aynısını stations / departments / roles / shifts için tekrarlayın)
+drop policy if exists "Authenticated full access" on stations;
+create policy "Authenticated full access" on stations    for all to authenticated using (true) with check (true);
+
+drop policy if exists "Authenticated full access" on departments;
+create policy "Authenticated full access" on departments for all to authenticated using (true) with check (true);
+
+drop policy if exists "Authenticated full access" on roles;
+create policy "Authenticated full access" on roles       for all to authenticated using (true) with check (true);
+
+drop policy if exists "Authenticated full access" on employees;
+create policy "Authenticated full access" on employees   for all to authenticated using (true) with check (true);
+
+drop policy if exists "Authenticated full access" on shifts;
+create policy "Authenticated full access" on shifts      for all to authenticated using (true) with check (true);
