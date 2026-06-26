@@ -10,7 +10,9 @@ import {
   fetchRoles, createRole, deleteRole,
   fetchSalesConfigs,
 } from './lib/db';
-import { isSupabaseConfigError } from './lib/supabase';
+import { isSupabaseConfigError, getCurrentSession, onAuthChange, signOut, emailToUsername } from './lib/supabase';
+import type { Session } from '@supabase/supabase-js';
+import { LoginScreen } from './components/auth/LoginScreen';
 import { Sidebar, TopbarMobile, ToastStack } from './components/layout/Sidebar';
 import { ScheduleScreen } from './components/schedule/ScheduleScreen';
 import { EmployeesScreen } from './components/employees/EmployeesScreen';
@@ -136,6 +138,8 @@ export default function App() {
   const [activeMonth, setActiveMonth] = useState<string>(todayYearMonth);
   const [loading,     setLoading]     = useState(true);
   const [loadError,   setLoadError]   = useState<string | null>(null);
+  const [session,     setSession]     = useState<Session | null>(null);
+  const [authReady,   setAuthReady]   = useState(false);
   const [shiftModalOpen, setShiftModalOpen] = useState(false);
   const [shiftToEdit,    setShiftToEdit]    = useState<Shift | null>(null);
   const [empModalOpen,   setEmpModalOpen]   = useState(false);
@@ -149,12 +153,37 @@ export default function App() {
   useEffect(() => { localStorage.setItem('vy_mode', mode); }, [mode]);
   useEffect(() => { setDrawer(false); }, [view]);
 
+  // Oturum kapısı: açılışta mevcut oturumu oku, sonra login/logout/token değişimlerini dinle.
   useEffect(() => {
+    let mounted = true;
+    getCurrentSession()
+      .then(s => { if (mounted) { setSession(s); setAuthReady(true); } })
+      .catch(() => { if (mounted) setAuthReady(true); });
+    const unsub = onAuthChange((_event, s) => {
+      setSession(s);
+      if (!s) {
+        // SIGNED_OUT / token yenilenemedi: bellekteki veriyi temizle, login'e dön.
+        setEmployees([]); setShifts([]);
+        setStations([]); setDepartments([]); setRoles([]); setSalesConfigs([]);
+        setLoadError(null); setLoading(true);
+      }
+    });
+    return () => { mounted = false; unsub(); };
+  }, []);
+
+  // Veri yükleme yalnızca oturum açıkken çalışır (girişten önce fetch yok).
+  // userId'ye bağlı: token yenilenince (aynı kullanıcı) tekrar yüklemez.
+  const userId = session?.user?.id ?? null;
+  useEffect(() => {
+    if (!userId) return;
+    let active = true;
+    setLoading(true);
     async function load() {
       try {
         const [sts, depts, rls, emps, shfts, sconfigs] = await Promise.all([
           fetchStations(), fetchDepartments(), fetchRoles(), fetchEmployees(), fetchShifts(), fetchSalesConfigs(),
         ]);
+        if (!active) return;
         setStations(sts);
         setDepartments(depts);
         setRoles(rls);
@@ -163,20 +192,30 @@ export default function App() {
         setSalesConfigs(sconfigs);
       } catch (err) {
         console.error('Veri yüklenemedi:', err);
-        setLoadError(loadErrorMessage(err));
+        if (active) setLoadError(loadErrorMessage(err));
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     }
     load();
+    return () => { active = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [userId]);
 
   const toast = useCallback((msg: string) => {
     const id = Date.now() + Math.random();
     setToasts(t => [...t, { id, msg }]);
     setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 2600);
   }, []);
+
+  async function handleSignOut() {
+    try {
+      await signOut();
+    } catch {
+      toast('Çıkış yapılamadı, tekrar deneyin');
+    }
+    // Oturum durumu sıfırlama ve veri temizliği onAuthChange aboneliğinde yapılır.
+  }
 
   const stationNames = stations.map(s => s.name);
   const deptNames    = departments.map(d => d.name);
@@ -427,6 +466,21 @@ export default function App() {
     return result;
   }
 
+  if (!authReady) {
+    return (
+      <div style={{ display: 'grid', placeItems: 'center', height: '100vh', background: 'var(--background)' }}>
+        <div style={{ textAlign: 'center', color: 'var(--muted-foreground)' }}>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>Yükleniyor…</div>
+          <div style={{ fontSize: 13 }}>Oturum kontrol ediliyor</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <LoginScreen />;
+  }
+
   if (loading || loadError) {
     return (
       <div style={{ display: 'grid', placeItems: 'center', height: '100vh', background: 'var(--background)' }}>
@@ -546,6 +600,8 @@ export default function App() {
         onNav={setView}
         open={drawer}
         onClose={() => setDrawer(false)}
+        username={emailToUsername(session.user.email)}
+        onSignOut={handleSignOut}
       />
       {drawer && <div className="scrim" onClick={() => setDrawer(false)} />}
 

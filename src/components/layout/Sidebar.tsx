@@ -17,9 +17,11 @@ interface SidebarProps {
   onNav: (id: ViewId) => void;
   open: boolean;
   onClose: () => void;
+  username: string;
+  onSignOut: () => void;
 }
 
-export function Sidebar({ view, onNav, open, onClose }: SidebarProps) {
+export function Sidebar({ view, onNav, open, onClose, username, onSignOut }: SidebarProps) {
   return (
     <aside className={`sidebar${open ? ' open' : ''}`}>
       <div className="sidebar-brand">
@@ -43,6 +45,21 @@ export function Sidebar({ view, onNav, open, onClose }: SidebarProps) {
           </button>
         ))}
       </nav>
+
+      <div className="sidebar-foot">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <span className="brand-mark" style={{ width: 30, height: 30, flex: '0 0 auto' }}>
+            <Icon name="userCheck" size={16} />
+          </span>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {username}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>Oturum açık</div>
+          </div>
+        </div>
+        <Button variant="outline" size="sm" onClick={onSignOut} style={{ width: '100%' }}>Çıkış</Button>
+      </div>
     </aside>
   );
 }
