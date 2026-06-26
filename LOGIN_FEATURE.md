@@ -26,7 +26,7 @@ birincil amacı bu açığı kapatmaktır.
 ### Bu sürümün kapsamı (IN SCOPE)
 - Kullanıcı adı + parola ile giriş ekranı.
 - Sadece kimliği doğrulanmış (authenticated) kullanıcılar uygulamaya erişebilir.
-- 5 tablonun tamamında RLS açık + "authenticated full access" politikası → giriş yapmamış istek
+- 8 public tablonun tamamında RLS açık + "authenticated full access" politikası → giriş yapmamış istek
   hiçbir satır döndürmez / yazamaz.
 - Oturum (session) yönetimi: kalıcı oturum, otomatik JWT yenileme (supabase-js hallediyor).
 - Çıkış (sign-out) kontrolü.
@@ -128,9 +128,10 @@ Uygulama açılışı
      kalır ve giriş `Email not confirmed` hatası verir; sentetik domain doğrulama linki alamaz.
    - Kullanıcı adları **ASCII küçük harf** (bkz. §2.1 kuralı).
 2. **Kayıt kapat:** Auth → Providers → Email → "Enable sign-ups" kapat.
-3. **RLS aç + politika** (5 tablo: `stations`, `departments`, `roles`, `employees`, `shifts`).
-   `supabase/schema.sql` içindeki [satır 90-99] güncellenecek **ve** canlı DB'ye Supabase MCP ile
-   uygulanacak:
+3. **RLS aç + politika** — **8 public tablo**: çekirdek 5 (`stations`, `departments`, `roles`,
+   `employees`, `shifts`) → `supabase/schema.sql`; satış 3 (`sales_import_configs`,
+   `sales_daily_reports`, `sales_import_runs`) → `supabase/create_sales_dashboard.sql`. Her ikisi de
+   güncellendi **ve** canlı DB'ye Supabase MCP ile uygulanacak:
    ```sql
    alter table <tablo> enable row level security;
    create policy "Authenticated full access" on <tablo>
@@ -199,7 +200,8 @@ Uygulama açılışı
 
 | Dosya | Değişiklik |
 | --- | --- |
-| `supabase/schema.sql` | RLS aç + 5 politika (yorumdan çıkar/genişlet) |
+| `supabase/schema.sql` | RLS aç + 5 çekirdek politika |
+| `supabase/create_sales_dashboard.sql` | RLS aç + 3 satış tablosu politikası |
 | `src/lib/supabase.ts` | Auth yardımcıları + domain sabiti |
 | `src/components/auth/LoginScreen.tsx` | **YENİ** giriş ekranı (claude.ai/design `templates/giris`'ten port) |
 | `public/coskun-petrol-watermark.png` | **YENİ** — tasarım projesinden indirilecek watermark görseli |
