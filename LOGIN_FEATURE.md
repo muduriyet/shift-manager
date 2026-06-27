@@ -1,7 +1,7 @@
 # Login Feature — Kimlik Doğrulama (Authentication)
 
 Son güncelleme: 2026-06-27
-Durum: **Faz 1 tamam** (client kodu yazıldı + yerelde doğrulandı) · **Faz 2 bekliyor** (canlı RLS + kullanıcı provisioning)
+Durum: **TAMAMLANDI** — auth canlıda (Faz 1 + Faz 2). Prod'da giriş/çıkış/veri uçtan uca doğrulandı.
 
 İlerleme notu:
 - ✅ Faz 1: `supabase.ts` auth helper'ları, `LoginScreen.tsx` (tasarımdan port), `App.tsx` session
@@ -9,7 +9,11 @@ Durum: **Faz 1 tamam** (client kodu yazıldı + yerelde doğrulandı) · **Faz 2
   temiz; yerelde doğrulandı (login render, boş-alan hataları, yanlış kimlik → genel hata, Göster/Gizle).
 - ✅ **Watermark görseli:** `public/coskun-petrol-watermark.png` eklendi (şeffaf zeminli beyaz logo).
   Mavi gradient üstünde yerelde doğrulandı. (Not: 314 KB / 1448×1086 — istenirse sonradan küçültülebilir.)
-- ⏳ Faz 2: kullanıcı oluştur (Auto Confirm!) → deploy → canlı RLS'i Supabase MCP ile aç → doğrula.
+- ✅ Faz 2: admin kullanıcısı (onaylı) + gated app prod deploy (PROMOTED, commit `29f56d0`) + 8 tabloda
+  RLS/politika (Supabase MCP migration `enable_rls_authenticated_all_tables`). Doğrulandı: anon 0 satır,
+  authenticated tam erişim, advisor `rls_disabled_in_public` ERROR'ları temizlendi, prod giriş/çıkış/veri çalışıyor.
+- Opsiyonel kalan: Leaked Password Protection (Auth WARN) kapalı; şube/departman bazlı ince taneli RLS
+  sonraki işe ertelendi (`rls_policy_always_true` WARN'ları bilinçli karar).
 
 Bu dosya, dağıtımdaki (Vercel) uygulamaya kullanıcı adı + parola ile giriş özelliği eklenmesinin
 spesifikasyonunu ve uygulama adımlarını tanımlar.
