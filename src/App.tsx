@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, lazy, Suspense } from 'react';
-import type { ViewId, ScheduleMode, Employee, Shift, ShiftStatus, ShiftCodeKey, StationName, DepartmentName, RoleName, Station, Department, Role, SalesImportConfig } from './types';
+import type { ViewId, ScheduleMode, Employee, Shift, ShiftStatus, ShiftCodeKey, StationName, DepartmentName, RoleName, Station, Department, Role, SalesImportConfig, Task, Profile } from './types';
 import { SHIFT_CODES, WORK_CODES, isWithinEmployment } from './constants';
 import {
   fetchEmployees, fetchShifts,
@@ -9,6 +9,7 @@ import {
   fetchDepartments, createDepartment, deleteDepartment,
   fetchRoles, createRole, deleteRole,
   fetchSalesConfigs,
+  fetchTasks, fetchProfiles, setTaskDone,
 } from './lib/db';
 import { isSupabaseConfigError, getCurrentSession, onAuthChange, signOut, emailToUsername } from './lib/supabase';
 import type { Session } from '@supabase/supabase-js';
@@ -19,6 +20,7 @@ import { EmployeesScreen } from './components/employees/EmployeesScreen';
 import { DailyScreen } from './components/daily/DailyScreen';
 import { ReportsScreen } from './components/reports/ReportsScreen';
 import { SettingsScreen } from './components/settings/SettingsScreen';
+import { TaskNotebookScreen } from './components/tasks/TaskNotebookScreen';
 import { ShiftModal } from './components/modals/ShiftModal';
 import { EmployeeModal } from './components/modals/EmployeeModal';
 import { ScheduleImportModal } from './components/modals/ScheduleImportModal';
@@ -62,7 +64,7 @@ interface EmployeeFormData {
 
 const DEFAULT_VIEW: ViewId = 'cizelge';
 const DEFAULT_SCHEDULE_MODE: ScheduleMode = 'ay';
-const VIEW_IDS: readonly ViewId[] = ['cizelge', 'personeller', 'gunluk', 'raporlar', 'ayarlar', 'satis'];
+const VIEW_IDS: readonly ViewId[] = ['cizelge', 'personeller', 'gunluk', 'gorev', 'raporlar', 'ayarlar', 'satis'];
 const SCHEDULE_MODES: readonly ScheduleMode[] = ['hafta', 'ay'];
 
 function isViewId(value: string | null): value is ViewId {
@@ -135,6 +137,8 @@ export default function App() {
   const [employees,   setEmployees]   = useState<Employee[]>([]);
   const [shifts,      setShifts]      = useState<Shift[]>([]);
   const [salesConfigs, setSalesConfigs] = useState<SalesImportConfig[]>([]);
+  const [tasks,       setTasks]       = useState<Task[]>([]);
+  const [profiles,    setProfiles]    = useState<Profile[]>([]);
   const [activeMonth, setActiveMonth] = useState<string>(todayYearMonth);
   const [loading,     setLoading]     = useState(true);
   const [loadError,   setLoadError]   = useState<string | null>(null);
@@ -165,6 +169,7 @@ export default function App() {
         // SIGNED_OUT / token yenilenemedi: bellekteki veriyi temizle, login'e dön.
         setEmployees([]); setShifts([]);
         setStations([]); setDepartments([]); setRoles([]); setSalesConfigs([]);
+        setTasks([]); setProfiles([]);
         setLoadError(null); setLoading(true);
       }
     });
@@ -180,8 +185,9 @@ export default function App() {
     setLoading(true);
     async function load() {
       try {
-        const [sts, depts, rls, emps, shfts, sconfigs] = await Promise.all([
+        const [sts, depts, rls, emps, shfts, sconfigs, tsks, profs] = await Promise.all([
           fetchStations(), fetchDepartments(), fetchRoles(), fetchEmployees(), fetchShifts(), fetchSalesConfigs(),
+          fetchTasks(), fetchProfiles(),
         ]);
         if (!active) return;
         setStations(sts);
@@ -190,6 +196,8 @@ export default function App() {
         setEmployees(emps);
         setShifts(shfts);
         setSalesConfigs(sconfigs);
+        setTasks(tsks);
+        setProfiles(profs);
       } catch (err) {
         console.error('Veri yüklenemedi:', err);
         if (active) setLoadError(loadErrorMessage(err));
@@ -404,6 +412,16 @@ export default function App() {
     }
   }
 
+  async function handleToggleTaskDone(task: Task, done: boolean) {
+    try {
+      await setTaskDone(task, done);
+      // Tekrarlayan görev tamamlanınca sunucu yeni bir örnek ekleyebilir → taze çek.
+      setTasks(await fetchTasks());
+    } catch {
+      toast('Görev güncellenemedi');
+    }
+  }
+
   async function handleApplyScheduleImport(plan: ScheduleImportPlan): Promise<ScheduleImportApplyResult> {
     const result: ScheduleImportApplyResult = {
       created: 0,
@@ -557,6 +575,15 @@ export default function App() {
           station={station} setStation={setStation}
           dept={dept} setDept={setDept}
           setStatus={handleSetStatus}
+        />
+      );
+      break;
+    case 'gorev':
+      screen = (
+        <TaskNotebookScreen
+          tasks={tasks}
+          profiles={profiles}
+          onToggleDone={handleToggleTaskDone}
         />
       );
       break;

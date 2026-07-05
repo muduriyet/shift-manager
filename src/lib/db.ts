@@ -5,6 +5,7 @@ import type {
   Station, Department, Role,
   SalesImportConfig, SalesConfigStatus, SalesMapping, SalesDailyReport,
   SalesImportScope, SalesReportValues, SalesImportApplyResult, SalesDailyView,
+  Task, TaskPriority, RepeatKind, RepeatUnit, Profile,
 } from '../types';
 
 const supabase = () => getSupabaseClient();
@@ -589,4 +590,193 @@ export async function applySalesImport(input: SalesImportApplyInput): Promise<Sa
     action: res.action as 'insert' | 'update',
     changedFields: res.changed_fields ?? {},
   };
+}
+
+// ---- Görev Defteri: profiles ----
+
+interface ProfileRow { id: string; username: string; display_name: string; is_active: boolean; }
+
+function toProfile(r: ProfileRow): Profile {
+  return { id: r.id, username: r.username, displayName: r.display_name, isActive: r.is_active };
+}
+
+// Giriş yapan kullanıcı dizini (atama listesi + ad/avatar). Tümü çekilir; aktif
+// süzme UI'da yapılır (pasif bir atanan hâlâ adıyla gösterilebilsin).
+export async function fetchProfiles(): Promise<Profile[]> {
+  const { data, error } = await supabase().from('profiles').select('*').order('display_name');
+  if (error) throw error;
+  return (data as ProfileRow[]).map(toProfile);
+}
+
+// ---- Görev Defteri: tasks ----
+
+interface TaskRow {
+  id: number;
+  title: string;
+  note: string;
+  priority: string;
+  due_date: string | null;
+  done: boolean;
+  done_at: string | null;
+  is_team: boolean;
+  assignee_id: string | null;
+  created_by: string | null;
+  repeat_kind: string;
+  repeat_n: number;
+  repeat_unit: string;
+  series_id: number | null;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+function toTask(r: TaskRow): Task {
+  return {
+    id: r.id,
+    title: r.title,
+    note: r.note,
+    priority: r.priority as TaskPriority,
+    dueDate: r.due_date,
+    done: r.done,
+    doneAt: r.done_at,
+    isTeam: r.is_team,
+    assigneeId: r.assignee_id,
+    createdBy: r.created_by,
+    repeatKind: r.repeat_kind as RepeatKind,
+    repeatN: r.repeat_n,
+    repeatUnit: r.repeat_unit as RepeatUnit,
+    seriesId: r.series_id,
+    archivedAt: r.archived_at,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+export interface TaskForm {
+  title: string;
+  note: string;
+  priority: TaskPriority;
+  dueDate: string | null;   // YYYY-MM-DD; null = backlog
+  isTeam: boolean;
+  assigneeId: string | null;
+  repeatKind: RepeatKind;
+  repeatN: number;
+  repeatUnit: RepeatUnit;
+}
+
+// Yerel (TR) tarih aritmetiği — 'YYYY-MM-DD' string'i yerel gece yarısı olarak parse
+// edilir (new Date('YYYY-MM-DD') UTC parse eder → gün kayması olur, ondan kaçınılır).
+function parseYmd(s: string): Date {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+function formatYmd(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+function nextDueDate(base: Date, kind: RepeatKind, n: number, unit: RepeatUnit): Date {
+  const d = new Date(base);
+  if (kind === 'daily') d.setDate(d.getDate() + 1);
+  else if (kind === 'weekly') d.setDate(d.getDate() + 7);
+  else if (kind === 'monthly') d.setMonth(d.getMonth() + 1);
+  else if (kind === 'custom') {
+    const k = Math.max(1, n);
+    if (unit === 'gün') d.setDate(d.getDate() + k);
+    else if (unit === 'hafta') d.setDate(d.getDate() + k * 7);
+    else if (unit === 'ay') d.setMonth(d.getMonth() + k);
+  }
+  return d;
+}
+
+export async function fetchTasks(): Promise<Task[]> {
+  const { data, error } = await supabase()
+    .from('tasks')
+    .select('*')
+    .is('archived_at', null)
+    .order('id');
+  if (error) throw error;
+  return (data as TaskRow[]).map(toTask);
+}
+
+export async function createTask(form: TaskForm, createdBy: string | null): Promise<Task> {
+  const { data, error } = await supabase()
+    .from('tasks')
+    .insert({
+      title: form.title,
+      note: form.note,
+      priority: form.priority,
+      due_date: form.dueDate,
+      is_team: form.isTeam,
+      assignee_id: form.assigneeId,
+      created_by: createdBy,
+      repeat_kind: form.repeatKind,
+      repeat_n: form.repeatN,
+      repeat_unit: form.repeatUnit,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return toTask(data as TaskRow);
+}
+
+export async function updateTask(id: number, form: TaskForm): Promise<Task> {
+  const { data, error } = await supabase()
+    .from('tasks')
+    .update({
+      title: form.title,
+      note: form.note,
+      priority: form.priority,
+      due_date: form.dueDate,
+      is_team: form.isTeam,
+      assignee_id: form.assigneeId,
+      repeat_kind: form.repeatKind,
+      repeat_n: form.repeatN,
+      repeat_unit: form.repeatUnit,
+    })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return toTask(data as TaskRow);
+}
+
+// Soft delete (D6): satırı silmez, archived_at doldurur; fetchTasks bunları süzer.
+export async function archiveTask(id: number): Promise<void> {
+  const { error } = await supabase()
+    .from('tasks')
+    .update({ archived_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+// Tamamlandı işaretleme + tekrar (GD-4/D5): tekrarlayan görev tamamlanınca o örnek
+// "done" kalır (Tamamlanan'da), bir sonraki örnek yeni satır olarak eklenir. series_id
+// örnekleri zincirler. Tüm alanları hesaba katmak için tam Task nesnesi alınır.
+export async function setTaskDone(task: Task, done: boolean): Promise<void> {
+  const { error } = await supabase()
+    .from('tasks')
+    .update({ done, done_at: done ? new Date().toISOString() : null })
+    .eq('id', task.id);
+  if (error) throw error;
+
+  if (done && task.repeatKind !== 'none') {
+    const base = task.dueDate ? parseYmd(task.dueDate) : new Date();
+    const next = formatYmd(nextDueDate(base, task.repeatKind, task.repeatN, task.repeatUnit));
+    const { error: insErr } = await supabase().from('tasks').insert({
+      title: task.title,
+      note: task.note,
+      priority: task.priority,
+      due_date: next,
+      is_team: task.isTeam,
+      assignee_id: task.assigneeId,
+      created_by: task.createdBy,
+      repeat_kind: task.repeatKind,
+      repeat_n: task.repeatN,
+      repeat_unit: task.repeatUnit,
+      series_id: task.seriesId ?? task.id,
+    });
+    if (insErr) throw insErr;
+  }
 }
