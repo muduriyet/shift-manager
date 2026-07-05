@@ -102,6 +102,22 @@ export interface Task {
   updatedAt: string;
 }
 
+export interface TaskComment {
+  id: number;
+  taskId: number;
+  authorId: string | null;   // profiles.id
+  body: string;
+  createdAt: string;
+}
+
+export interface TaskActivity {
+  id: number;
+  taskId: number;
+  actorId: string | null;    // profiles.id
+  action: string;            // ör. 'görevi oluşturdu', 'yorum ekledi'
+  createdAt: string;
+}
+
 export interface MonthDay {
   n: number;
   wIdx: number;

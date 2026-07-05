@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import type { Task, Profile, TaskPriority, RepeatKind, RepeatUnit } from '../../types';
+import { useState, useEffect } from 'react';
+import type { Task, Profile, TaskPriority, RepeatKind, RepeatUnit, TaskComment, TaskActivity } from '../../types';
 import type { TaskForm } from '../../lib/db';
+import { fetchComments, fetchActivity, addComment } from '../../lib/db';
 import { Dialog } from '../ui/Dialog';
 import { Button } from '../ui/Button';
 import { Field, Input, Textarea } from '../ui/Field';
@@ -19,6 +20,16 @@ const SEL_TO_KIND: Record<RepeatSel, RepeatKind> = {
 const KIND_TO_SEL: Record<RepeatKind, RepeatSel> = {
   none: 'Tekrarlanmaz', daily: 'Her gün', weekly: 'Her hafta', monthly: 'Her ay', custom: 'Özel',
 };
+
+// Göreli zaman (TR): şimdi / N dk / N sa / N gün önce, sonra tarih.
+function relTime(iso: string): string {
+  const s = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+  if (s < 60) return 'şimdi';
+  const m = Math.floor(s / 60); if (m < 60) return `${m} dk önce`;
+  const h = Math.floor(m / 60); if (h < 24) return `${h} sa önce`;
+  const d = Math.floor(h / 24); if (d < 30) return `${d} gün önce`;
+  return new Date(iso).toLocaleDateString('tr-TR');
+}
 
 interface TaskFormState {
   title: string;
@@ -56,6 +67,18 @@ export function TaskModal({ task, profiles, currentUserId, onClose, onSave, onAr
   });
   const [error, setError] = useState<string | undefined>();
   const [confirmArchive, setConfirmArchive] = useState(false);
+  const [comments, setComments] = useState<TaskComment[]>([]);
+  const [activity, setActivity] = useState<TaskActivity[]>([]);
+  const [newComment, setNewComment] = useState('');
+
+  useEffect(() => {
+    if (!task) return;
+    let active = true;
+    Promise.all([fetchComments(task.id), fetchActivity(task.id)])
+      .then(([c, a]) => { if (active) { setComments(c); setActivity(a); } })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [task]);
 
   const set = <K extends keyof TaskFormState>(k: K, v: TaskFormState[K]) => {
     setForm(f => ({ ...f, [k]: v }));
@@ -74,6 +97,17 @@ export function TaskModal({ task, profiles, currentUserId, onClose, onSave, onAr
     assigneeId: !f.isTeam ? f.assigneeId : (f.assigneeId ?? currentUserId), // team→kişi geçişinde atananı geri getir
   }));
   const takeOver = () => setForm(f => ({ ...f, assigneeId: currentUserId, isTeam: false }));
+
+  async function submitComment() {
+    const text = newComment.trim();
+    if (!text || !task) return;
+    try {
+      await addComment(task.id, currentUserId, text);
+      setNewComment('');
+      const [c, a] = await Promise.all([fetchComments(task.id), fetchActivity(task.id)]);
+      setComments(c); setActivity(a);
+    } catch { /* sessizce geç */ }
+  }
 
   function handleSave() {
     const title = form.title.trim();
@@ -177,6 +211,48 @@ export function TaskModal({ task, profiles, currentUserId, onClose, onSave, onAr
               </button>
             </div>
           </div>
+
+          {editing && (
+            <div className="col-2">
+              <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Yorumlar</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, margin: '8px 0', maxHeight: 200, overflowY: 'auto' }}>
+                {comments.length === 0 && <span style={{ fontSize: 12.5, color: 'var(--muted-foreground)' }}>Henüz yorum yok.</span>}
+                {comments.map(c => (
+                  <div key={c.id} style={{ display: 'flex', gap: 8 }}>
+                    <Avatar name={nameOf(c.authorId) || '?'} size={22} />
+                    <div style={{ flex: '1 1 auto', minWidth: 0, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 12.5, fontWeight: 600 }}>{nameOf(c.authorId) || '—'}</span>
+                        <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>{relTime(c.createdAt)}</span>
+                      </div>
+                      <p style={{ fontSize: 13, color: 'var(--foreground)', margin: '2px 0 0', lineHeight: 1.45, overflowWrap: 'anywhere' }}>{c.body}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+                  <Input value={newComment} placeholder="Yorum yazın..." onChange={e => setNewComment(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submitComment(); } }} />
+                </div>
+                <Button variant="outline" onClick={submitComment}>Ekle</Button>
+              </div>
+            </div>
+          )}
+
+          {editing && activity.length > 0 && (
+            <div className="col-2">
+              <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Aktivite</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+                {activity.slice(0, 6).map(a => (
+                  <div key={a.id} style={{ display: 'flex', alignItems: 'baseline', gap: 7, fontSize: 12.5, color: 'var(--muted-foreground)' }}>
+                    <span style={{ color: 'var(--border-strong)' }}>•</span>
+                    <span><b style={{ color: 'var(--foreground)', fontWeight: 600 }}>{nameOf(a.actorId) || '—'}</b> {a.action}</span>
+                    <span style={{ marginLeft: 'auto', fontSize: 11, whiteSpace: 'nowrap' }}>{relTime(a.createdAt)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </Dialog>
 

@@ -5,7 +5,7 @@ import type {
   Station, Department, Role,
   SalesImportConfig, SalesConfigStatus, SalesMapping, SalesDailyReport,
   SalesImportScope, SalesReportValues, SalesImportApplyResult, SalesDailyView,
-  Task, TaskPriority, RepeatKind, RepeatUnit, Profile,
+  Task, TaskPriority, RepeatKind, RepeatUnit, Profile, TaskComment, TaskActivity,
 } from '../types';
 
 const supabase = () => getSupabaseClient();
@@ -718,7 +718,9 @@ export async function createTask(form: TaskForm, createdBy: string | null): Prom
     .select()
     .single();
   if (error) throw error;
-  return toTask(data as TaskRow);
+  const task = toTask(data as TaskRow);
+  await logTaskActivity(task.id, createdBy, 'görevi oluşturdu');
+  return task;
 }
 
 export async function updateTask(id: number, form: TaskForm): Promise<Task> {
@@ -754,12 +756,13 @@ export async function archiveTask(id: number): Promise<void> {
 // Tamamlandı işaretleme + tekrar (GD-4/D5): tekrarlayan görev tamamlanınca o örnek
 // "done" kalır (Tamamlanan'da), bir sonraki örnek yeni satır olarak eklenir. series_id
 // örnekleri zincirler. Tüm alanları hesaba katmak için tam Task nesnesi alınır.
-export async function setTaskDone(task: Task, done: boolean): Promise<void> {
+export async function setTaskDone(task: Task, done: boolean, actorId: string | null): Promise<void> {
   const { error } = await supabase()
     .from('tasks')
     .update({ done, done_at: done ? new Date().toISOString() : null })
     .eq('id', task.id);
   if (error) throw error;
+  await logTaskActivity(task.id, actorId, done ? 'tamamlandı olarak işaretledi' : 'görevi yeniden açtı');
 
   if (done && task.repeatKind !== 'none') {
     const base = task.dueDate ? parseYmd(task.dueDate) : new Date();
@@ -779,4 +782,40 @@ export async function setTaskDone(task: Task, done: boolean): Promise<void> {
     });
     if (insErr) throw insErr;
   }
+}
+
+// ---- Görev Defteri: yorumlar + aktivite (GD-5) ----
+
+interface CommentRow { id: number; task_id: number; author_id: string | null; body: string; created_at: string; }
+function toComment(r: CommentRow): TaskComment {
+  return { id: r.id, taskId: r.task_id, authorId: r.author_id, body: r.body, createdAt: r.created_at };
+}
+
+interface ActivityRow { id: number; task_id: number; actor_id: string | null; action: string; created_at: string; }
+function toActivity(r: ActivityRow): TaskActivity {
+  return { id: r.id, taskId: r.task_id, actorId: r.actor_id, action: r.action, createdAt: r.created_at };
+}
+
+export async function fetchComments(taskId: number): Promise<TaskComment[]> {
+  const { data, error } = await supabase().from('task_comments').select('*').eq('task_id', taskId).order('created_at');
+  if (error) throw error;
+  return (data as CommentRow[]).map(toComment);
+}
+
+export async function fetchActivity(taskId: number): Promise<TaskActivity[]> {
+  const { data, error } = await supabase().from('task_activity').select('*').eq('task_id', taskId).order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data as ActivityRow[]).map(toActivity);
+}
+
+// Aktivite kaydı best-effort: ana aksiyonu bloklamasın (hata olursa yalnızca uyarır).
+export async function logTaskActivity(taskId: number, actorId: string | null, action: string): Promise<void> {
+  const { error } = await supabase().from('task_activity').insert({ task_id: taskId, actor_id: actorId, action });
+  if (error) console.warn('Aktivite kaydı eklenemedi:', error);
+}
+
+export async function addComment(taskId: number, authorId: string | null, body: string): Promise<void> {
+  const { error } = await supabase().from('task_comments').insert({ task_id: taskId, author_id: authorId, body });
+  if (error) throw error;
+  await logTaskActivity(taskId, authorId, 'yorum ekledi');
 }

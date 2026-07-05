@@ -9,7 +9,7 @@ import {
   fetchDepartments, createDepartment, deleteDepartment,
   fetchRoles, createRole, deleteRole,
   fetchSalesConfigs,
-  fetchTasks, fetchProfiles, setTaskDone, createTask, updateTask, archiveTask,
+  fetchTasks, fetchProfiles, setTaskDone, createTask, updateTask, archiveTask, logTaskActivity,
 } from './lib/db';
 import type { TaskForm } from './lib/db';
 import { isSupabaseConfigError, getCurrentSession, onAuthChange, signOut, emailToUsername } from './lib/supabase';
@@ -418,7 +418,7 @@ export default function App() {
 
   async function handleToggleTaskDone(task: Task, done: boolean) {
     try {
-      await setTaskDone(task, done);
+      await setTaskDone(task, done, userId);
       // Tekrarlayan görev tamamlanınca sunucu yeni bir örnek ekleyebilir → taze çek.
       setTasks(await fetchTasks());
     } catch {
@@ -430,6 +430,13 @@ export default function App() {
     try {
       if (id !== null) {
         await updateTask(id, form);
+        const prev = taskToEdit;
+        if (prev) {
+          let action = 'görevi güncelledi';
+          if (form.isTeam !== prev.isTeam) action = form.isTeam ? 'görevi ortak göreve çevirdi' : 'görevi kişiye atadı';
+          else if ((form.assigneeId ?? null) !== (prev.assigneeId ?? null)) action = 'görevi devraldı';
+          await logTaskActivity(id, userId, action);
+        }
         toast('Görev güncellendi');
       } else {
         await createTask(form, userId);
