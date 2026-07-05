@@ -1,14 +1,15 @@
 # Görev Defteri — Ortak Görev / Yapılacaklar Takibi (Task Notebook)
 
 Son güncelleme: 2026-07-05
-Durum: **FAZ 1 + Sprint 4 TAMAMLANDI** — Sprint 1–4 tamamlandı ve uçtan uca doğrulandı (canlı DB'de). Çekirdek görev panosu + tekrarlayan rutinler + yorum/aktivite canlıya hazır. Sonraki (ertelenen): S5 Dosya ekleri · S6 Dışa aktarma + öne çıkarma.
+Durum: **FAZ 1 + Sprint 4 TAMAMLANDI; S5–S6 PLANLANDI** — Sprint 1–4 canlıya hazır (çekirdek pano + tekrar + yorum/aktivite). Bu doküman S5 (Dosya ekleri) ve S6 (Dışa aktarma) planını da içerir. GD-8 öne çıkarma (rozet/widget/bildirim) kullanıcı kararıyla **ertelendi** (S6 yalnız export).
 
 İlerleme notu:
 - ✅ **Sprint 1 (Temel + tesisat):** `create_task_notebook.sql` (profiles + tasks + RLS + seed) canlıya uygulandı ve sertleştirildi (advisor temiz); tipler, `db.ts` veri katmanı, yönlendirme/menü + ekran iskeleti. `tsc` temiz. Doğrulandı: 6 seed rutini listelendi, tamamlandı işaretleme + tekrar üretimi (spawn-next: görev 1 → yarına yeni örnek) çalıştı; test artefaktı temizlendi.
 - ✅ **Sprint 2 (Okuma panosu):** istatistik kartları, sayaçlı sekmeler, Rutinler/Bu Hafta gruplama, arama (tr-locale), kişi filtresi çipi, sayfalama, boş durum. `tsc` temiz. Doğrulandı: istatistikler (Açık 6/Bugün 3/Gecikmiş 0), sekme sayaçları, Rutinler (Günlük 3/Haftalık 1/Aylık 2) + Bu Hafta (Bugün 3/İleri 3) gruplama, arama, boş durum. (Kişi filtresi + sayfalama seed all-team & <10 olduğu için Sprint 3'te canlı test edilecek.)
 - ✅ **Sprint 3 (Yazma + tekrar):** TaskModal (ekle/düzenle), başlık/öncelik/tarih/tekrar/not, Ortak Görev + Devral, arşivle (onaylı soft-delete), satır→düzenle, Görev Ekle butonu. `tsc` temiz. Doğrulandı: oluştur (kişiye atanmış), kişi filtresi çipi, düzenle (öncelik + team toggle; updated_at trigger tetiklendi), arşivle (gizlendi, kayıt korundu), sayfalama (12 görev → Sayfa 1/2 → Sonraki). Test verisi temizlendi. (Devral tek kullanıcı olduğu için canlı test edilemedi; ≥2 kullanıcıda çalışır.) → **Faz 1 canlıya hazır.**
 - ✅ **Sprint 4 (İşbirliği):** yorum thread'i + aktivite akışı (düzenle diyaloğunda). `task_comments` + `task_activity` tabloları + RLS; oluştur/tamamla/düzenle/devral/yorum aksiyonları loglanır. `tsc` temiz. Doğrulandı: yorum ekleme → yorum kartı (ad/avatar/göreli zaman) + "yorum ekledi" aktivitesi (canlı; test verisi temizlendi).
-- ⬜ **Sonraki (ertelenen):** Sprint 5 Dosya ekleri (Storage) · Sprint 6 Dışa aktarma + öne çıkarma.
+- ⬜ **Sprint 5 (Ekler) — planlandı:** görev dosyaları (Supabase Storage, private, 25 MB). Yükleme **anında** Storage'a; yeni görevde taslak (task_id=null) → kaydedince bağlanır, iptalde silinir; indirme signed URL ile.
+- ⬜ **Sprint 6 (Dışa aktarma) — planlandı:** Excel (filtrelenmiş liste, mevcut `xlsx`) + tarayıcı yazdırma (`window.print`). GD-8 öne çıkarma **ertelendi** (yalnız export).
 
 Bu dosya, Claude Design'da (`Shift-Manager UI Kit` → `templates/gorev-defteri`) tasarlanan **Görev Defteri** ekranının canlı uygulamaya entegrasyon spesifikasyonunu ve uygulama adımlarını tanımlar. Yaşayan (living) dokümandır; her sprint tamamlandıkça güncellenir.
 
@@ -28,9 +29,9 @@ Görev Defteri, **giriş yapan ofis (muhasebe) ekibi** için ortak bir yapılaca
 
 ### Kapsam DIŞI (ertelendi — sonraki sprintler)
 - ~~Yorumlar + aktivite kaydı~~ → ✅ Sprint 4'te eklendi.
-- **Dosya ekleri** (Supabase Storage) → Sprint 5.
-- **Dışa aktarma** (Excel/PDF) → Sprint 6.
-- **Kenar çubuğu görev sayacı rozeti / Dashboard "bekleyen görevler" widget'ı / gecikme bildirimi** → Sprint 6.
+- **Dosya ekleri** (Supabase Storage) → **Sprint 5 (planlandı — bu doküman §3/§5).**
+- **Dışa aktarma** (Excel + tarayıcı yazdırma) → **Sprint 6 (planlandı).**
+- **Kenar çubuğu rozeti / Dashboard widget / gecikme bildirimi (GD-8)** → **ertelendi** (kullanıcı kararı: S6 yalnız export). Genel Dashboard ekranı henüz yok; sentetik e-posta ile e-posta bildirimi teslim edilemez.
 - **Şube/Departman bazlı görev kapsamı + ince taneli RLS** → `branch-department-architecture` kararına bağlı; RLS şimdilik proje standardı `authenticated using(true)`.
 - Test altyapısı / birim test kalemi eklenmez (proje tercihi).
 
@@ -48,6 +49,9 @@ Görev Defteri, **giriş yapan ofis (muhasebe) ekibi** için ortak bir yapılaca
 | D6 | **Silme = arşivleme (soft-delete).** `archived_at timestamptz`; "sil" bunu doldurur ve satırı gizler; liste sorguları `archived_at is null` süzer. Kalıcı silme yok. | Muhasebe için denetim dostu; `employees` `is_active` desenini yansıtır. |
 | D7 | **Başlangıç rutin seti seed** (idempotent — yalnız `tasks` boşken). **Ortak görev** olarak (`is_team=true`, `assignee_id=null`), çünkü migration anında gerçek profil UUID'leri bilinmiyor. | Pano ilk günden faydalı; team sahipliği kullanıcı id'si gömmeyi önler. |
 | D8 | **Ertelendi (şimdi yapılmaz):** şube/kategori kapsamı, per-branch ince taneli RLS, kenar çubuğu sayacı + Dashboard widget, gecikme bildirimi. RLS proje standardı kalır. | `auth-rls-live` ve LOGIN_FEATURE'ın ince taneli RLS ertelemesiyle uyumlu. Tasarım `station`/`category`'yi zaten göstermiyor. |
+| D9 (S5) | **Dosya yükleme = anında Storage'a** (belleğe değil). `task_attachments.task_id` **nullable** → taslak yüklemeler; görev kaydedilince `task_id` bağlanır, diyalog kaydedilmeden kapanırsa taslak dosyalar (Storage nesnesi + satır) **silinir**. | Kullanıcı kararı: oluştururken de dosya eklenebilsin, belleği şişirmeden doğrudan kalıcı olsun. Ani tarayıcı kapanışında nadir orphan → sonradan temizlik işi (kabul edilir). |
+| D10 (S5) | **Storage bucket private, 25 MB/dosya.** İndirme kısa ömürlü **signed URL** ile. | Finansal belgeler herkese açık olmamalı. Free plan: 1 GB depolama + 5 GB/ay egress dahil; aşımda ücret değil kota. 25 MB üst sınır kotayı korur. |
+| D11 (S6) | **Export = Excel (filtrelenmiş liste) + tarayıcı yazdırma** (`window.print`). Yeni bağımlılık yok (`xlsx` + `exportRowsToExcel` mevcut). GD-8 (rozet/widget/bildirim) ertelendi. | En düşük efor, sıfır yeni infra; tasarımdaki "PDF olarak yazdır" = tarayıcı yazdırma. |
 
 ### Enine kesen doğruluk notları (build'e dahil, ayrı kalem değil)
 - **Yerel saat dilimi "bugün"** — today/overdue Türkiye yerel tarihinden hesaplanır, UTC değil (gece yarısına yakın "bugün" görevinin "gecikmiş"e dönmesini engeller).
@@ -173,6 +177,34 @@ create table if not exists task_activity (
 
 Aktivite **istemci tarafında** loglanır (`logTaskActivity`, best-effort — ana aksiyonu bloklamaz): oluştur / tamamla / yeniden aç / düzenle (team·devral·güncelle) / yorum ekle.
 
+### Dosya ekleri (`supabase/create_task_attachments.sql`, S5 — planlandı)
+
+Private `task-attachments` bucket (25 MB/dosya) + metadata tablosu. `task_id` **nullable**: taslak (henüz kaydedilmemiş görev) yüklemeleri `task_id=null` ile durur, kayıtta bağlanır, iptalde silinir. İndirme kısa ömürlü signed URL ile.
+
+```sql
+-- private bucket (25 MB)
+insert into storage.buckets (id, name, public, file_size_limit)
+values ('task-attachments', 'task-attachments', false, 26214400)
+on conflict (id) do nothing;
+
+create table if not exists task_attachments (
+  id           bigint primary key generated always as identity,
+  task_id      bigint references tasks(id) on delete cascade,   -- null = taslak
+  storage_path text not null,
+  file_name    text not null,
+  file_size    bigint not null default 0,
+  mime_type    text,
+  uploaded_by  uuid references profiles(id) on delete set null,
+  created_at   timestamptz not null default now()
+);
+create index if not exists task_attachments_task_id_idx on task_attachments(task_id);
+alter table task_attachments enable row level security;
+-- "Authenticated full access" (for all) — tasks ile aynı desen
+-- + storage.objects: authenticated select/insert/delete where bucket_id='task-attachments'
+```
+
+**db.ts (S5):** `uploadAttachment(taskId|null, file, uploadedBy)` (Storage'a yükle + satır) · `linkAttachments(ids, taskId)` (taslak→görev) · `fetchAttachments(taskId)` · `attachmentSignedUrl(path)` · `removeAttachment(id, path)` (Storage nesnesi + satır).
+
 ### TypeScript tipleri (`src/types/index.ts`)
 `snake_case` (DB) ↔ `camelCase` (TS) eşlemesi `Employee`/`Shift` desenini izler.
 
@@ -249,13 +281,17 @@ export interface TaskActivity {
 | GD-3 | Ekle/Düzenle/Arşivle + tamamlandı (yazma) | L | ✅ |
 | GD-4 | Tekrarlayan görev otomatik yeniden açılma (spawn-next) | M | ✅ |
 | GD-5 | Yorumlar + aktivite kaydı | M | ✅ |
-| GD-6 | Dosya ekleri (Supabase Storage) *(ertelendi)* | L | ⬜ |
-| GD-7 | Dışa aktarma (Excel/PDF) *(ertelendi)* | S–M | ⬜ |
-| GD-8 | Öne çıkarma + kapsam (rozet, widget, bildirim, şube) *(ertelendi)* | S | ⬜ |
+| GD-6 | Dosya ekleri (private Storage 25 MB; taslak-bağla/temizle; signed URL) | L | ⬜ **S5 planlandı** |
+| GD-7 | Dışa aktarma — Excel (filtrelenmiş) + tarayıcı yazdırma | S–M | ⬜ **S6 planlandı** |
+| GD-8 | Öne çıkarma (rozet/widget/bildirim, şube) | S | ⬜ ertelendi (kullanıcı kararı) |
 
 **GD-4 tekrar mantığı:** `setTaskDone(id, true)` içinde `repeat_kind !== 'none'` ise, örnek tamamlandı işaretlendikten (`done=true`, `done_at=now()`) sonra bir sonraki örnek eklenir — title/priority/note/assignee/team/repeat kopyalanır, `done=false`, `series_id = series_id ?? id`, `due_date =` kurala göre sonraki tarih (`daily +1g`, `weekly +7g`, `monthly +1ay`, `custom +N birim`), tamamlanan `due_date`'e (yoksa bugüne) göre. Tamamlanan örnekler **Tamamlanan** sekmesinde kalır.
 
 **GD-5 yorum/aktivite:** düzenle diyaloğu açılınca `fetchComments` + `fetchActivity` yüklenir. Yorum eklenince `task_comments`'a yazılır **ve** "yorum ekledi" aktivitesi loglanır. Diğer aksiyonlar (`createTask` → "görevi oluşturdu"; `setTaskDone` → "tamamlandı olarak işaretledi"/"görevi yeniden açtı"; düzenle → team/devral/güncelle) `logTaskActivity` ile en iyi çaba (best-effort) loglanır — aktivite yazımı başarısız olsa bile ana işlem bloklanmaz.
+
+**GD-6 dosya ekleri (S5):** dosya seçilince **anında** Storage'a yüklenir + `task_attachments` satırı yazılır (yeni görevde `task_id=null` taslak). **Kaydet** → taslaklar `task_id`'ye bağlanır; **İptal/kapat** → taslak dosyalar (Storage nesnesi + satır) silinir. Düzenlemede yüklemeler doğrudan bağlıdır; **kaldır** → hemen silinir. İndirme private bucket'tan kısa ömürlü signed URL ile. Not: ani tarayıcı kapanışı taslak orphan bırakabilir → ileride basit temizlik işi.
+
+**GD-7 dışa aktarma (S6):** `Dışa Aktar` menüsü (mevcut `DropdownButton`). **Excel:** o an filtrelenmiş/görünen liste `exportRowsToExcel` ile `.xlsx` (Görev / Atanan / Öncelik / Son Tarih / Durum / Tekrar). **PDF olarak yazdır:** `window.print()` + `@media print` stil sayfası (kenar çubuğu ve gereksiz krom gizlenir, yalnız liste kartı basılır).
 
 ---
 
@@ -269,8 +305,8 @@ Tek geliştirici; "sprint" = takvim değil, **teslim edilebilir artış** (efor 
 | ✅ **S2 · Okuma panosu** | GD-2 | L | Tasarımdaki okuma-yalnız pano tam |
 | ✅ **S3 · Yazma + tekrar** ➡️ *Faz 1 çıktı* | GD-3 + GD-4 | L | Tam işlevsel ortak pano; günlük rutin tamamlanınca yarınki kopya üretilir |
 | ✅ **S4 · İşbirliği** | GD-5 | M | Yorum thread + aktivite akışı |
-| ⬜ S5 · Ekler | GD-6 | L | Storage bucket + RLS + `task_attachments`; yükle/listele/kaldır |
-| ⬜ S6 · Dışa aktarma + öne çıkarma | GD-7 + GD-8 | M | Excel/PDF; rozet, Dashboard widget, gecikme bildirimi |
+| ⬜ S5 · Ekler | GD-6 | L | Private Storage bucket + RLS + `task_attachments`; anında yükle, taslak→bağla / iptalde temizle, signed URL indir/kaldır |
+| ⬜ S6 · Dışa aktarma | GD-7 | S–M | Excel (filtrelenmiş) + tarayıcı yazdırma. GD-8 (öne çıkarma) ertelendi |
 
 **Kritik yol:** S1 → S2 → S3 onaylı ürünü verir. S1–S3, ertelenen sprintlere bağlı değildir → Faz 1 çıkıp stabil kalabilir.
 
@@ -284,6 +320,8 @@ Tek geliştirici; "sprint" = takvim değil, **teslim edilebilir artış** (efor 
 4. **GD-4:** günlük seed rutini tamamla → **Tamamlanan**'a geçer ve `due_date = +1 gün`, aynı `series_id` ile yeni örnek belirir; iki satır kontrol edilir.
 5. **GD-5 (yorum/aktivite):** görevi düzenle → yorum yaz + **Ekle** → yorum kartı (ad/avatar/göreli zaman) belirir ve **Aktivite**'ye "yorum ekledi" düşer; `task_comments`/`task_activity` satırları `execute_sql` ile doğrulanır.
 6. **RLS:** oturumsuz istek 0 satır; oturumlu tam erişim — `auth-rls-live` ile tutarlı.
+7. **GD-6 (S5):** yeni görevde dosya seç → Storage'a yüklenir (taslak, `task_id=null`); **Kaydet** → dosya göreve bağlanır ve indirme (signed URL) çalışır. Ayrı bir yeni görevde dosya seç → **İptal** → taslak dosya silinir (Storage nesnesi + satır 0). Düzenlemede **kaldır** → hemen silinir. Storage + `task_attachments` `execute_sql`/panelde doğrulanır.
+8. **GD-7 (S6):** bir filtre uygula → **Dışa Aktar → Excel** → inen `.xlsx` yalnız filtrelenmiş satırları içerir. **PDF olarak yazdır** → yazdırma önizlemesi yalnız liste kartını gösterir (kenar çubuğu gizli).
 
 ---
 
@@ -293,11 +331,14 @@ Tek geliştirici; "sprint" = takvim değil, **teslim edilebilir artış** (efor 
 | --- | --- |
 | `supabase/create_task_notebook.sql` | **yeni** — profiles + trigger/backfill + tasks + RLS + updated_at trigger + seed |
 | `supabase/create_task_collab.sql` | **yeni** — task_comments + task_activity + RLS (S4) |
-| `src/types/index.ts` | `Task`/`Profile`/`TaskPriority`/`RepeatKind`/`RepeatUnit` + `TaskComment`/`TaskActivity`; `ViewId` += `'gorev'` |
-| `src/lib/db.ts` | profiles + tasks CRUD (`archiveTask`, `setTaskDone` tekrarlı) + yorum/aktivite (`fetchComments`/`addComment`/`fetchActivity`/`logTaskActivity`) + mapper'lar |
+| `supabase/create_task_attachments.sql` | **yeni (S5)** — `task-attachments` bucket (private, 25 MB) + `task_attachments` tablosu + RLS |
+| `src/types/index.ts` | `Task`/`Profile`/`TaskPriority`/`RepeatKind`/`RepeatUnit` + `TaskComment`/`TaskActivity` (+ `TaskAttachment` S5); `ViewId` += `'gorev'` |
+| `src/lib/db.ts` | profiles + tasks CRUD + yorum/aktivite + **dosya ekleri** (`uploadAttachment`/`linkAttachments`/`fetchAttachments`/`attachmentSignedUrl`/`removeAttachment`, S5) + mapper'lar |
+| `src/lib/excel.ts` | **mevcut** — `exportRowsToExcel` GD-7'de yeniden kullanılır |
 | `src/App.tsx` | profiles+tasks yükle; `currentUserId`; `case 'gorev'`; prop/handler geç; düzenlemede aktivite loglar |
 | `src/components/layout/Sidebar.tsx` | NAV girişi |
-| `src/components/tasks/TaskNotebookScreen.tsx` | **yeni** — pano (GD-1/2/3/4) |
-| `src/components/modals/TaskModal.tsx` | **yeni** — ekle/düzenle diyaloğu (GD-3) + yorum thread'i & aktivite akışı (GD-5) |
+| `src/components/tasks/TaskNotebookScreen.tsx` | **yeni** — pano (GD-1/2/3/4) + Dışa Aktar: Excel/yazdır (GD-7) |
+| `src/components/modals/TaskModal.tsx` | **yeni** — ekle/düzenle (GD-3) + yorum/aktivite (GD-5) + dosya ekleri (GD-6) |
+| `src/index.css` | göreve özel sınıflar + `@media print` yazdırma stili (GD-7) |
 | `src/index.css` | göreve özel sınıflar |
 | `FEATURE_TASKBOOK.md` | **bu dosya** — yaşayan spec/durum |
