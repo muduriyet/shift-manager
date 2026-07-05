@@ -8,6 +8,20 @@ Vardiya kontrolleri bir gün gecikmeli yapılır — 11 Haziran'ın devam kontro
 
 ---
 
+## Auth / Güvenlik
+
+Uygulama artık Supabase Auth oturumu olmadan veri çekmez. Açılışta mevcut oturum okunur; oturum yoksa `LoginScreen` gösterilir, oturum varsa lookup/personel/vardiya/satış config verileri yüklenir. Çıkışta App belleğindeki veri temizlenir ve login ekranına dönülür.
+
+Login ekranı kullanıcı adını sabit şirket domainiyle sentetik e-postaya çevirir:
+
+- `usernameToEmail("mert")` → `mert@coskunpetrol.com.tr`
+- Kullanıcı UI'da yalnızca kullanıcı adı ve parola girer
+- Supabase Auth tarafında e-posta/parola kullanıcısı önceden oluşturulmuş olmalıdır
+
+RLS çekirdek ve satış tablolarında açıktır. Mevcut politika modeli bilinçli olarak kaba tanelidir: `authenticated` rolündeki kullanıcılar tüm satırlara tam erişir. Şube/departman bazlı ince taneli yetkilendirme sonraki mimari adımlara bırakılmıştır.
+
+---
+
 ## Veri Modeli
 
 ### Lookup tabloları: `stations`, `departments`, `roles`
@@ -47,6 +61,20 @@ Vardiya kontrolleri bir gün gecikmeli yapılır — 11 Haziran'ın devam kontro
 | note | text | |
 
 **Kısıtlar:** `unique(emp_id, shift_date)` (tarihli kayıtlar için) bir personel/gün için tek vardiyayı garanti eder; `shifts_status_check` geçersiz status değerini DB'de engeller.
+
+### Satış tabloları
+
+Satış Dashboard ayrı tablolar ve view'lar kullanır; vardiya tablolarını değiştirmez.
+
+| Tablo / View | Amaç |
+|---|---|
+| `sales_import_configs` | Günlük/özet Excel dosyalarından hangi hücre/formüllerin okunacağını tanımlar. `is_system=true` seed config uygulama katmanında korunur. |
+| `sales_daily_reports` | İstasyon + departman + tarih bazında normalize günlük satış satırı. Aynı kapsam için tek satır (`unique(station_id, dept_id, report_date)`). |
+| `sales_import_runs` | Her "Uygula" aksiyonu için audit kaydı; dosya adları, config snapshot, parsed değerler, uyarılar ve değişen alanlar saklanır. |
+| `sales_dashboard_daily_view` | Dashboard ve veri gezgini için günlük normalize view; kart oranı ve litre başı ortalama gibi türev alanları üretir. |
+| `sales_dashboard_monthly_view` | Aylık/istasyon/departman toplamları için merkezi view. |
+
+`apply_sales_import(payload jsonb)` RPC tek transaction içinde günlük satış raporunu insert/update eder, audit kaydı oluşturur ve `last_import_run_id` alanını günceller.
 
 ---
 
@@ -98,10 +126,13 @@ Personel fiziksel olarak silinmez; "Pasife Al" ile `is_active = false` yapılır
 
 ```
 App.tsx
-├── Global state: employees, shifts, activeMonth, mode, view
+├── Auth gate: getCurrentSession / onAuthChange / signOut
+├── Global state: stations, departments, roles, employees, shifts, salesConfigs
+├── Persisted UI state: view, schedule mode
 ├── codesOf(empId): shifts'ten aylık kodları türetir
 ├── setCode(id, idx, code): aylık grid'den hücre günceller/siler
-└── handleSetStatus(shiftId, status): sadece WORK_CODES için çalışır
+├── handleSetStatus(shiftId, status): sadece WORK_CODES için çalışır
+└── SalesScreen lazy import: satış kodu yalnızca satış sekmesine girilince yüklenir
 
 ScheduleScreen
 ├── Haftalık/aylık mod seçimi
@@ -118,6 +149,13 @@ MonthlyView
 DailyScreen
 ├── Varsayılan görünüm: dün (addDays(TODAY_DATE, -1))
 └── Sadece WORK_CODES'lu vardiyaları listeler
+
+SalesScreen
+├── Sekmeler: Dashboard / İçe Aktar / Konfigürasyon / Veri Gezgini
+├── Dashboard: sales_dashboard_daily_view üzerinden KPI + grafikler
+├── İçe Aktar: günlük + özet Excel dosyası, preview, uyarı/hata, apply_sales_import RPC
+├── Konfigürasyon: kullanıcı config oluşturma/güncelleme; system config doğrudan düzenlenmez
+└── Veri Gezgini: grafik/pivot/ham tablo ve inline satış raporu düzenleme
 ```
 
 ---
@@ -126,14 +164,21 @@ DailyScreen
 
 ```
 Supabase DB
-    ↓ fetchEmployees / fetchShifts (uygulama açılışında bir kez)
-App.tsx state: employees[], shifts[]
+    ↓ getCurrentSession / onAuthChange
+LoginScreen veya App shell
+    ↓ oturum varsa Promise.all(fetchStations, fetchDepartments, fetchRoles, fetchEmployees, fetchShifts, fetchSalesConfigs)
+App.tsx state: stations[], departments[], roles[], employees[], shifts[], salesConfigs[]
     ↓ props
 ScheduleScreen → MonthlyView / WeeklyView
     ↓ setCode / onShiftClick
 App.tsx → createShift / updateShift / deleteShift → Supabase
-    ↓ optimistic update
+    ↓ state update
 shifts[] state güncellenir → re-render
+
+SalesScreen → SalesImportTab
+    ↓ buildSalesImportPlan (client-side parse/validation)
+applySalesImportPlan → apply_sales_import RPC
+    ↓ satış dashboard/view verisi tekrar okunur
 ```
 
 DB yazma işlemleri çoğunlukla iyimser değil — önce DB, sonra state güncellenir; hata `toast` ile gösterilir. (`handleSetStatus` iyimser günceller, hatada geri alır.)
@@ -147,7 +192,13 @@ DB yazma işlemleri çoğunlukla iyimser değil — önce DB, sonra state günce
 - **Excel'e Aktar (FEAT-002):** Seçili şube/departman/ay için aylık çizelgeyi stilli Excel olarak indirir. `public/templates/vardiya-export-template.xlsx` template'i baz alınır (yalnızca `sheet1.xml` üretilen veriyle değiştirilir, stiller korunur). Personel bazlı kod toplamları + genel toplam içerir. Kod: `lib/scheduleExport.ts`.
 - **Excel'den İçe Aktar (FEAT-001):** Sabit şablon formatında Excel yükleyerek seçili kapsamın aylık çizelgesini günceller. İsim eşleştirmesi `employees.schedule_name` (Çizelge İsmi) üzerinden Türkçe-normalize edilerek yapılır. Yazmadan önce önizleme/doğrulama gösterilir (eşleşen, oluştur/güncelle/sil sayıları, bloklayıcı kontroller, uyarılar) ve mevcut vardiya varsa checkbox onayı gerekir. `Öz` hücreleri korunur (serbest saat Excel'de temsil edilemez). Kod: `lib/scheduleImport.ts`.
 
-Ayrıntılı ürün kararları: `FEATURE_BACKLOG.md`.
+Satış Dashboard ayrıca iki dosyalı import akışı sunar:
+
+- **Günlük rapor + özet rapor:** `.xlsx/.xls` dosyaları seçilir, aktif import config'e göre hücre/formül değerleri okunur.
+- **Preview/plan:** `buildSalesImportPlan` zorunlu alanları, birim fiyatları, kaynak rapor tarihini, mevcut kayıt farklarını ve uyarıları üretir.
+- **Uygula:** `apply_sales_import` RPC tek transaction içinde upsert + audit yapar. Sistem seed config'i sıfır kurulumda `create_sales_dashboard.sql` içindedir; eski DB'ler için seed update SQL dosyaları vardır.
+
+Ayrıntılı ürün kararları: `FEATURE_BACKLOG.md`, `FEATURE_DASHBOARD.md`, `LOGIN_FEATURE.md`.
 
 ---
 
@@ -157,8 +208,9 @@ Ayrıntılı ürün kararları: `FEATURE_BACKLOG.md`.
 |---|---|---|
 | `vy_view` | ViewId | Son aktif ekran |
 | `vy_mode` | `hafta` \| `ay` | Son aktif çizelge modu |
+| `vy_sales_tab` | `dashboard` \| `import` \| `config` \| `explore` | Son aktif satış sekmesi |
 
-`vy_view` ve `vy_mode` okunurken guard'larla (`isViewId` / `isScheduleMode`) doğrulanır; bozuk/eski değer güvenli default'a düşer.
+`vy_view`, `vy_mode` ve `vy_sales_tab` okunurken guard'larla doğrulanır; bozuk/eski değer güvenli default'a düşer.
 
 Personel sıra düzeni (`empOrder` MonthlyView'da) sadece oturum süresince tutulur, kalıcı değildir.
 
@@ -166,7 +218,8 @@ Personel sıra düzeni (`empOrder` MonthlyView'da) sadece oturum süresince tutu
 
 ## Bilinen Sınırlamalar / Gelecek Adayları
 
-- RLS tüm tablolarda kapalı (anon key tarayıcı bundle'ında); production öncesi auth + RLS planlanıyor
-- `fetchShifts` açılışta tüm vardiyaları çeker; veri büyüyünce tarih-aralıklı sorguya geçilmesi planlanıyor
+- RLS açık ancak politika modeli geniş: her authenticated kullanıcı tüm verilere erişebilir. Şube/departman bazlı authorization henüz yok.
+- `fetchShifts` açılışta tüm vardiyaları çeker; veri büyüyünce tarih-aralıklı sorguya geçilmesi planlanıyor.
+- Satış dashboard verisi view üzerinden okunur; dashboard sekmesi şu an manuel refresh/yeni sekmeye girişle güncel veriyi alır, realtime yok.
 - Personel satır sırası yalnızca oturum belleğinde; backend'e kaydedilmiyor
 - Şube → Departman iç içe kapsam yapısı (yaklaşım B) planlanıyor ancak henüz uygulanmadı
