@@ -1,7 +1,7 @@
 # Görev Defteri — Ortak Görev / Yapılacaklar Takibi (Task Notebook)
 
-Son güncelleme: 2026-07-05
-Durum: **FAZ 1 + Sprint 4 TAMAMLANDI; S5–S6 PLANLANDI** — Sprint 1–4 canlıya hazır (çekirdek pano + tekrar + yorum/aktivite). Bu doküman **S4.5 (QA sertleştirme)**, S5 (Dosya ekleri) ve S6 (Dışa aktarma) planını da içerir. GD-8 öne çıkarma (rozet/widget/bildirim) kullanıcı kararıyla **ertelendi** (S6 yalnız export). QA kaynağı: `FEATURE_TASKBOOK_QA.md` (Codex, 2026-07-06).
+Son güncelleme: 2026-07-06
+Durum: **TÜM SPRINTLER TAMAMLANDI (S1–S6 + S4.5); GD-8 ERTELENDİ** — Görev Defteri canlıya hazır: çekirdek pano, tekrarlayan rutinler, yorum/aktivite, QA sertleştirme (H1–H6), dosya ekleri (Storage), Excel dışa aktarma. Öne çıkarma (rozet/widget/bildirim, GD-8) kullanıcı kararıyla **ertelendi**. QA kaynağı: `FEATURE_TASKBOOK_QA.md` (Codex, 2026-07-06).
 
 İlerleme notu:
 - ✅ **Sprint 1 (Temel + tesisat):** `create_task_notebook.sql` (profiles + tasks + RLS + seed) canlıya uygulandı ve sertleştirildi (advisor temiz); tipler, `db.ts` veri katmanı, yönlendirme/menü + ekran iskeleti. `tsc` temiz. Doğrulandı: 6 seed rutini listelendi, tamamlandı işaretleme + tekrar üretimi (spawn-next: görev 1 → yarına yeni örnek) çalıştı; test artefaktı temizlendi.
@@ -10,7 +10,7 @@ Durum: **FAZ 1 + Sprint 4 TAMAMLANDI; S5–S6 PLANLANDI** — Sprint 1–4 canl�
 - ✅ **Sprint 4 (İşbirliği):** yorum thread'i + aktivite akışı (düzenle diyaloğunda). `task_comments` + `task_activity` tabloları + RLS; oluştur/tamamla/düzenle/devral/yorum aksiyonları loglanır. `tsc` temiz. Doğrulandı: yorum ekleme → yorum kartı (ad/avatar/göreli zaman) + "yorum ekledi" aktivitesi (canlı; test verisi temizlendi).
 - ✅ **Sprint 4.5 (QA sertleştirme):** H1 aylık ay-sonu clamp, H2 Bu Hafta = bu hafta due, H3 tekrar duplicate guard (partial unique index — canlıya uygulandı), H4 Rutinler yalnız açık, H5 buton pending/disabled, H6 boş aktivite satırı. `tsc` temiz. Doğrulandı: H1 (`31 Oca +1ay → 28 Şub`, node) + H3 (index mevcut); H2/H4/H5/H6 kod tamam, görsel pass login bekliyor.
 - ✅ **Sprint 5 (Ekler):** görev dosyaları (Supabase Storage, private, 25 MB). Yükleme **anında** Storage'a; yeni görevde taslak (task_id=null) → kaydedince bağlanır, iptalde silinir; indirme signed URL ile. `tsc` temiz. Doğrulandı (canlı): upload → signed URL → link → remove uçtan uca (RLS insert/read/delete), Dosya Ekleri UI render; test verisi temizlendi.
-- ⬜ **Sprint 6 (Dışa aktarma) — planlandı:** **yalnız Excel** (filtrelenmiş liste, mevcut `xlsx`). PDF/yazdırma **yok** (kullanıcı kararı). GD-8 öne çıkarma **ertelendi**.
+- ✅ **Sprint 6 (Dışa aktarma):** Dışa Aktar butonu → **yalnız Excel** (o an filtrelenmiş liste; `exportRowsToExcel`). PDF/yazdırma yok. `tsc` temiz; canlı: buton render + tıklama hatasız. GD-8 öne çıkarma **ertelendi**.
 
 Bu dosya, Claude Design'da (`Shift-Manager UI Kit` → `templates/gorev-defteri`) tasarlanan **Görev Defteri** ekranının canlı uygulamaya entegrasyon spesifikasyonunu ve uygulama adımlarını tanımlar. Yaşayan (living) dokümandır; her sprint tamamlandıkça güncellenir.
 
@@ -295,7 +295,7 @@ export interface TaskActivity {
 | H5 | Kaydet/Ekle/Arşivle pending-disabled state | S | ✅ kod |
 | H6 | Boş aktivite "Henüz aktivite yok." satırı | S | ✅ kod |
 | GD-6 | Dosya ekleri (private Storage 25 MB; taslak-bağla/temizle; signed URL) | L | ✅ |
-| GD-7 | Dışa aktarma — yalnız Excel (filtrelenmiş) | S | ⬜ **S6 planlandı** |
+| GD-7 | Dışa aktarma — yalnız Excel (filtrelenmiş) | S | ✅ |
 | GD-8 | Öne çıkarma (rozet/widget/bildirim, şube) | S | ⬜ ertelendi (kullanıcı kararı) |
 
 **GD-4 tekrar mantığı:** `setTaskDone(id, true)` içinde `repeat_kind !== 'none'` ise, örnek tamamlandı işaretlendikten (`done=true`, `done_at=now()`) sonra bir sonraki örnek eklenir — title/priority/note/assignee/team/repeat kopyalanır, `done=false`, `series_id = series_id ?? id`, `due_date =` kurala göre sonraki tarih (`daily +1g`, `weekly +7g`, `monthly +1ay`, `custom +N birim`), tamamlanan `due_date`'e (yoksa bugüne) göre. Tamamlanan örnekler **Tamamlanan** sekmesinde kalır.

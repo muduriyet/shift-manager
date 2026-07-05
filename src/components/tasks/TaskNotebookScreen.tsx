@@ -7,6 +7,7 @@ import { Tabs } from '../ui/Tabs';
 import { Button } from '../ui/Button';
 import { SearchInput } from '../ui/Field';
 import { EmptyState } from '../ui/EmptyState';
+import { exportRowsToExcel } from '../../lib/excel';
 
 // Sprint 2 (GD-2): okuma panosu — istatistik kartları, sekmeler + gruplama, arama,
 // kişi filtresi, sayfalama. Ekle/düzenle/arşivle diyaloğu GD-3'te (Sprint 3) gelecek.
@@ -154,6 +155,19 @@ export function TaskNotebookScreen({ tasks, profiles, onToggleDone, onAdd, onEdi
 
   const countLabel = `${list.length} görev gösteriliyor · ${cOpen} açık · ${cOverdue} gecikmiş`;
 
+  // Dışa aktar (GD-7): yalnız Excel — o an filtrelenmiş liste. PDF/yazdırma yok.
+  async function handleExport() {
+    const rows = list.map(t => ({
+      'Görev': t.title,
+      'Atanan': t.isTeam ? 'Ortak (Tüm Ekip)' : (nameOf(t.assigneeId) || '—'),
+      'Öncelik': t.priority,
+      'Son Tarih': t.dueDate ?? '',
+      'Durum': t.done ? 'Tamamlandı' : (isOverdue(t) ? 'Gecikmiş' : 'Açık'),
+      'Tekrar': repeatLabel(t) ?? '',
+    }));
+    await exportRowsToExcel({ rows, sheetName: 'Görevler', fileName: `gorev-defteri-${today}.xlsx` });
+  }
+
   return (
     <div>
       <div className="page-head">
@@ -162,6 +176,7 @@ export function TaskNotebookScreen({ tasks, profiles, onToggleDone, onAdd, onEdi
           <p className="page-desc">Ekibin ortak görev ve rutin takibi</p>
         </div>
         <div className="page-actions">
+          <Button variant="outline" icon="download" onClick={handleExport} disabled={list.length === 0}>Dışa Aktar</Button>
           <Button icon="plus" onClick={onAdd}>Görev Ekle</Button>
         </div>
       </div>
