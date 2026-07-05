@@ -1,11 +1,11 @@
 # Görev Defteri — Ortak Görev / Yapılacaklar Takibi (Task Notebook)
 
 Son güncelleme: 2026-07-05
-Durum: **GELİŞTİRİLİYOR** — Sprint 1 tamamlandı ve canlı DB'de uçtan uca doğrulandı; Sprint 2 (okuma panosu) sırada. Faz 1 kapsamı: çekirdek görev panosu + tekrarlayan (rutin) görevlerin otomatik yeniden açılması.
+Durum: **GELİŞTİRİLİYOR** — Sprint 1–2 tamamlandı ve doğrulandı; Sprint 3 (yazma + tekrar UI) sırada. Faz 1 kapsamı: çekirdek görev panosu + tekrarlayan (rutin) görevlerin otomatik yeniden açılması.
 
 İlerleme notu:
 - ✅ **Sprint 1 (Temel + tesisat):** `create_task_notebook.sql` (profiles + tasks + RLS + seed) canlıya uygulandı ve sertleştirildi (advisor temiz); tipler, `db.ts` veri katmanı, yönlendirme/menü + ekran iskeleti. `tsc` temiz. Doğrulandı: 6 seed rutini listelendi, tamamlandı işaretleme + tekrar üretimi (spawn-next: görev 1 → yarına yeni örnek) çalıştı; test artefaktı temizlendi.
-- ⬜ **Sprint 2 (Okuma panosu):** istatistik kartları, sekmeler + gruplama, arama, kişi filtresi, sayfalama, boş durum.
+- ✅ **Sprint 2 (Okuma panosu):** istatistik kartları, sayaçlı sekmeler, Rutinler/Bu Hafta gruplama, arama (tr-locale), kişi filtresi çipi, sayfalama, boş durum. `tsc` temiz. Doğrulandı: istatistikler (Açık 6/Bugün 3/Gecikmiş 0), sekme sayaçları, Rutinler (Günlük 3/Haftalık 1/Aylık 2) + Bu Hafta (Bugün 3/İleri 3) gruplama, arama, boş durum. (Kişi filtresi + sayfalama seed all-team & <10 olduğu için Sprint 3'te canlı test edilecek.)
 - ⬜ **Sprint 3 (Yazma + tekrar):** görev ekle/düzenle/arşivle, tamamlandı işaretleme, atama/ortak görev/devral, tekrar eden görev üretimi. → **Faz 1 canlıya çıkar.**
 - ⬜ **Sonraki (ertelenen):** Sprint 4 Yorum + Aktivite · Sprint 5 Dosya ekleri (Storage) · Sprint 6 Dışa aktarma + öne çıkarma.
 
@@ -204,7 +204,7 @@ export interface Task {
 | --- | --- | --- | --- |
 | GD-0 | Veri temeli — migration, RLS, seed, tipler, db.ts | M | ✅ |
 | GD-1 | Yönlendirme + ekran iskeleti + veri yükleme | S | ✅ |
-| GD-2 | Görev panosu (okuma) — istatistik, sekmeler, gruplama, arama, filtre, sayfalama | L | ⬜ |
+| GD-2 | Görev panosu (okuma) — istatistik, sekmeler, gruplama, arama, filtre, sayfalama | L | ✅ |
 | GD-3 | Ekle/Düzenle/Arşivle + tamamlandı (yazma) | L | ⬜ |
 | GD-4 | Tekrarlayan görev otomatik yeniden açılma (spawn-next) | M | ⬜ |
 | GD-5 | Yorumlar + aktivite kaydı *(ertelendi)* | M | ⬜ |
