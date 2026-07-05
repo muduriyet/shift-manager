@@ -9,7 +9,7 @@ import {
   fetchDepartments, createDepartment, deleteDepartment,
   fetchRoles, createRole, deleteRole,
   fetchSalesConfigs,
-  fetchTasks, fetchProfiles, setTaskDone, createTask, updateTask, archiveTask, logTaskActivity,
+  fetchTasks, fetchProfiles, setTaskDone, createTask, updateTask, archiveTask, logTaskActivity, linkAttachments,
 } from './lib/db';
 import type { TaskForm } from './lib/db';
 import { isSupabaseConfigError, getCurrentSession, onAuthChange, signOut, emailToUsername } from './lib/supabase';
@@ -426,7 +426,7 @@ export default function App() {
     }
   }
 
-  async function handleSaveTask(form: TaskForm, id: number | null) {
+  async function handleSaveTask(form: TaskForm, id: number | null, draftAttachmentIds: number[] = []) {
     try {
       if (id !== null) {
         await updateTask(id, form);
@@ -439,7 +439,8 @@ export default function App() {
         }
         toast('Görev güncellendi');
       } else {
-        await createTask(form, userId);
+        const created = await createTask(form, userId);
+        if (draftAttachmentIds.length) await linkAttachments(draftAttachmentIds, created.id);
         toast('Yeni görev eklendi');
       }
       setTasks(await fetchTasks());

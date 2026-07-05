@@ -9,7 +9,7 @@ Durum: **FAZ 1 + Sprint 4 TAMAMLANDI; S5–S6 PLANLANDI** — Sprint 1–4 canl�
 - ✅ **Sprint 3 (Yazma + tekrar):** TaskModal (ekle/düzenle), başlık/öncelik/tarih/tekrar/not, Ortak Görev + Devral, arşivle (onaylı soft-delete), satır→düzenle, Görev Ekle butonu. `tsc` temiz. Doğrulandı: oluştur (kişiye atanmış), kişi filtresi çipi, düzenle (öncelik + team toggle; updated_at trigger tetiklendi), arşivle (gizlendi, kayıt korundu), sayfalama (12 görev → Sayfa 1/2 → Sonraki). Test verisi temizlendi. (Devral tek kullanıcı olduğu için canlı test edilemedi; ≥2 kullanıcıda çalışır.) → **Faz 1 canlıya hazır.**
 - ✅ **Sprint 4 (İşbirliği):** yorum thread'i + aktivite akışı (düzenle diyaloğunda). `task_comments` + `task_activity` tabloları + RLS; oluştur/tamamla/düzenle/devral/yorum aksiyonları loglanır. `tsc` temiz. Doğrulandı: yorum ekleme → yorum kartı (ad/avatar/göreli zaman) + "yorum ekledi" aktivitesi (canlı; test verisi temizlendi).
 - ✅ **Sprint 4.5 (QA sertleştirme):** H1 aylık ay-sonu clamp, H2 Bu Hafta = bu hafta due, H3 tekrar duplicate guard (partial unique index — canlıya uygulandı), H4 Rutinler yalnız açık, H5 buton pending/disabled, H6 boş aktivite satırı. `tsc` temiz. Doğrulandı: H1 (`31 Oca +1ay → 28 Şub`, node) + H3 (index mevcut); H2/H4/H5/H6 kod tamam, görsel pass login bekliyor.
-- ⬜ **Sprint 5 (Ekler) — planlandı:** görev dosyaları (Supabase Storage, private, 25 MB). Yükleme **anında** Storage'a; yeni görevde taslak (task_id=null) → kaydedince bağlanır, iptalde silinir; indirme signed URL ile.
+- ✅ **Sprint 5 (Ekler):** görev dosyaları (Supabase Storage, private, 25 MB). Yükleme **anında** Storage'a; yeni görevde taslak (task_id=null) → kaydedince bağlanır, iptalde silinir; indirme signed URL ile. `tsc` temiz. Doğrulandı (canlı): upload → signed URL → link → remove uçtan uca (RLS insert/read/delete), Dosya Ekleri UI render; test verisi temizlendi.
 - ⬜ **Sprint 6 (Dışa aktarma) — planlandı:** **yalnız Excel** (filtrelenmiş liste, mevcut `xlsx`). PDF/yazdırma **yok** (kullanıcı kararı). GD-8 öne çıkarma **ertelendi**.
 
 Bu dosya, Claude Design'da (`Shift-Manager UI Kit` → `templates/gorev-defteri`) tasarlanan **Görev Defteri** ekranının canlı uygulamaya entegrasyon spesifikasyonunu ve uygulama adımlarını tanımlar. Yaşayan (living) dokümandır; her sprint tamamlandıkça güncellenir.
@@ -294,7 +294,7 @@ export interface TaskActivity {
 | H4 | Rutinler yalnız açık (filtre + sayaç) | S | ✅ kod |
 | H5 | Kaydet/Ekle/Arşivle pending-disabled state | S | ✅ kod |
 | H6 | Boş aktivite "Henüz aktivite yok." satırı | S | ✅ kod |
-| GD-6 | Dosya ekleri (private Storage 25 MB; taslak-bağla/temizle; signed URL) | L | ⬜ **S5 planlandı** |
+| GD-6 | Dosya ekleri (private Storage 25 MB; taslak-bağla/temizle; signed URL) | L | ✅ |
 | GD-7 | Dışa aktarma — yalnız Excel (filtrelenmiş) | S | ⬜ **S6 planlandı** |
 | GD-8 | Öne çıkarma (rozet/widget/bildirim, şube) | S | ⬜ ertelendi (kullanıcı kararı) |
 
@@ -353,7 +353,7 @@ Tek geliştirici; "sprint" = takvim değil, **teslim edilebilir artış** (efor 
 | `supabase/create_task_notebook.sql` | profiles + trigger/backfill + tasks + RLS + updated_at trigger + seed | mevcut (S1) |
 | `supabase/create_task_collab.sql` | task_comments + task_activity + RLS | mevcut (S4) |
 | `supabase/harden_task_recurrence.sql` | `tasks(series_id, due_date)` partial unique index | mevcut (S4.5) |
-| `supabase/create_task_attachments.sql` | `task-attachments` bucket (private, 25 MB) + `task_attachments` tablosu + RLS | planlandı (S5) |
+| `supabase/create_task_attachments.sql` | `task-attachments` bucket (private, 25 MB) + `task_attachments` tablosu + RLS (storage.objects dahil) | mevcut (S5) |
 | `src/types/index.ts` | `Task`/`Profile`/… + `TaskComment`/`TaskActivity`; `TaskAttachment`; `ViewId` += `'gorev'` | mevcut; `TaskAttachment` planlandı (S5) |
 | `src/lib/db.ts` | tasks/profiles CRUD + yorum/aktivite; ay-sonu clamp (H1) + tekrar guard (H3); dosya ekleri (S5) + mapper'lar | mevcut; H1/H3 + ekler planlandı |
 | `src/lib/excel.ts` | `exportRowsToExcel` GD-7'de yeniden kullanılır | mevcut |

@@ -5,7 +5,7 @@ import type {
   Station, Department, Role,
   SalesImportConfig, SalesConfigStatus, SalesMapping, SalesDailyReport,
   SalesImportScope, SalesReportValues, SalesImportApplyResult, SalesDailyView,
-  Task, TaskPriority, RepeatKind, RepeatUnit, Profile, TaskComment, TaskActivity,
+  Task, TaskPriority, RepeatKind, RepeatUnit, Profile, TaskComment, TaskActivity, TaskAttachment,
 } from '../types';
 
 const supabase = () => getSupabaseClient();
@@ -829,4 +829,66 @@ export async function addComment(taskId: number, authorId: string | null, body: 
   const { error } = await supabase().from('task_comments').insert({ task_id: taskId, author_id: authorId, body });
   if (error) throw error;
   await logTaskActivity(taskId, authorId, 'yorum ekledi');
+}
+
+// ---- Görev Defteri: dosya ekleri (GD-6) ----
+
+const ATTACH_BUCKET = 'task-attachments';
+
+interface AttachmentRow {
+  id: number; task_id: number | null; storage_path: string; file_name: string;
+  file_size: number; mime_type: string | null; uploaded_by: string | null; created_at: string;
+}
+function toAttachment(r: AttachmentRow): TaskAttachment {
+  return {
+    id: r.id, taskId: r.task_id, storagePath: r.storage_path, fileName: r.file_name,
+    fileSize: r.file_size, mimeType: r.mime_type, uploadedBy: r.uploaded_by, createdAt: r.created_at,
+  };
+}
+
+export async function fetchAttachments(taskId: number): Promise<TaskAttachment[]> {
+  const { data, error } = await supabase().from('task_attachments').select('*').eq('task_id', taskId).order('created_at');
+  if (error) throw error;
+  return (data as AttachmentRow[]).map(toAttachment);
+}
+
+// Dosyayı Storage'a yükler + metadata satırı ekler. taskId null → taslak
+// (görev kaydında linkAttachments ile bağlanır; iptalde removeAttachment ile silinir).
+export async function uploadAttachment(taskId: number | null, file: File, uploadedBy: string | null): Promise<TaskAttachment> {
+  const safeName = file.name.replace(/[^\w.\-]+/g, '_');
+  const prefix = taskId != null ? `tasks/${taskId}` : 'drafts';
+  const path = `${prefix}/${crypto.randomUUID()}-${safeName}`;
+  const { error: upErr } = await supabase().storage.from(ATTACH_BUCKET).upload(path, file, { contentType: file.type || undefined, upsert: false });
+  if (upErr) throw upErr;
+  const { data, error } = await supabase().from('task_attachments').insert({
+    task_id: taskId,
+    storage_path: path,
+    file_name: file.name,
+    file_size: file.size,
+    mime_type: file.type || null,
+    uploaded_by: uploadedBy,
+  }).select().single();
+  if (error) throw error;
+  return toAttachment(data as AttachmentRow);
+}
+
+// Taslak yüklemeleri (task_id=null) yeni göreve bağlar.
+export async function linkAttachments(ids: number[], taskId: number): Promise<void> {
+  if (ids.length === 0) return;
+  const { error } = await supabase().from('task_attachments').update({ task_id: taskId }).in('id', ids);
+  if (error) throw error;
+}
+
+// Private bucket → kısa ömürlü (5 dk) signed URL ile indirme.
+export async function attachmentSignedUrl(path: string): Promise<string> {
+  const { data, error } = await supabase().storage.from(ATTACH_BUCKET).createSignedUrl(path, 300);
+  if (error) throw error;
+  return data.signedUrl;
+}
+
+export async function removeAttachment(id: number, path: string): Promise<void> {
+  const { error: sErr } = await supabase().storage.from(ATTACH_BUCKET).remove([path]);
+  if (sErr) throw sErr;
+  const { error } = await supabase().from('task_attachments').delete().eq('id', id);
+  if (error) throw error;
 }

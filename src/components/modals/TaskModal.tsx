@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import type { Task, Profile, TaskPriority, RepeatKind, RepeatUnit, TaskComment, TaskActivity } from '../../types';
+import { useState, useEffect, useRef } from 'react';
+import type { Task, Profile, TaskPriority, RepeatKind, RepeatUnit, TaskComment, TaskActivity, TaskAttachment } from '../../types';
 import type { TaskForm } from '../../lib/db';
-import { fetchComments, fetchActivity, addComment } from '../../lib/db';
+import { fetchComments, fetchActivity, addComment, fetchAttachments, uploadAttachment, removeAttachment, attachmentSignedUrl } from '../../lib/db';
 import { Dialog } from '../ui/Dialog';
 import { Button } from '../ui/Button';
 import { Field, Input, Textarea } from '../ui/Field';
@@ -31,6 +31,10 @@ function relTime(iso: string): string {
   return new Date(iso).toLocaleDateString('tr-TR');
 }
 
+const MAX_ATTACH_SIZE = 25 * 1024 * 1024; // 25 MB
+function fmtSize(b: number): string { return b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB'; }
+function fileExt(name: string): string { const i = name.lastIndexOf('.'); return i > -1 ? name.slice(i + 1).toLowerCase() : ''; }
+
 interface TaskFormState {
   title: string;
   priority: TaskPriority;
@@ -48,7 +52,7 @@ interface TaskModalProps {
   profiles: Profile[];
   currentUserId: string | null;
   onClose: () => void;
-  onSave: (form: TaskForm, id: number | null) => void | Promise<void>;
+  onSave: (form: TaskForm, id: number | null, draftAttachmentIds: number[]) => void | Promise<void>;
   onArchive: (id: number) => void | Promise<void>;
 }
 
@@ -73,12 +77,16 @@ export function TaskModal({ task, profiles, currentUserId, onClose, onSave, onAr
   const [saving, setSaving] = useState(false);
   const [commenting, setCommenting] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [attachError, setAttachError] = useState<string | undefined>();
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!task) return;
     let active = true;
-    Promise.all([fetchComments(task.id), fetchActivity(task.id)])
-      .then(([c, a]) => { if (active) { setComments(c); setActivity(a); } })
+    Promise.all([fetchComments(task.id), fetchActivity(task.id), fetchAttachments(task.id)])
+      .then(([c, a, at]) => { if (active) { setComments(c); setActivity(a); setAttachments(at); } })
       .catch(() => {});
     return () => { active = false; };
   }, [task]);
@@ -121,6 +129,36 @@ export function TaskModal({ task, profiles, currentUserId, onClose, onSave, onAr
     finally { setArchiving(false); }
   }
 
+  async function onFilesPicked() {
+    const input = fileRef.current;
+    const files = Array.from(input?.files || []);
+    if (input) input.value = '';
+    if (!files.length) return;
+    setAttachError(undefined);
+    setUploading(true);
+    try {
+      for (const f of files) {
+        if (f.size > MAX_ATTACH_SIZE) { setAttachError(`${f.name} 25 MB sınırını aşıyor`); continue; }
+        const att = await uploadAttachment(task ? task.id : null, f, currentUserId);
+        setAttachments(prev => [...prev, att]);
+      }
+    } catch { setAttachError('Dosya yüklenemedi, tekrar deneyin'); }
+    finally { setUploading(false); }
+  }
+  async function removeAtt(att: TaskAttachment) {
+    try { await removeAttachment(att.id, att.storagePath); setAttachments(prev => prev.filter(a => a.id !== att.id)); } catch { /* sessizce geç */ }
+  }
+  async function downloadAtt(att: TaskAttachment) {
+    try { const url = await attachmentSignedUrl(att.storagePath); window.open(url, '_blank'); } catch { /* sessizce geç */ }
+  }
+  // Yeni görevde kaydedilmeden kapatılırsa taslak dosyaları temizle (D9).
+  async function handleUserClose() {
+    if (!editing && attachments.length) {
+      await Promise.all(attachments.map(a => removeAttachment(a.id, a.storagePath).catch(() => {})));
+    }
+    onClose();
+  }
+
   async function handleSave() {
     const title = form.title.trim();
     if (!title) { setError('Görev başlığı zorunludur'); return; }
@@ -138,7 +176,7 @@ export function TaskModal({ task, profiles, currentUserId, onClose, onSave, onAr
       repeatUnit: repeatKind === 'custom' ? form.customUnit : 'gün',
     };
     setSaving(true);
-    try { await onSave(payload, task?.id ?? null); }
+    try { await onSave(payload, task?.id ?? null, editing ? [] : attachments.map(a => a.id)); }
     finally { setSaving(false); }
   }
 
@@ -147,7 +185,7 @@ export function TaskModal({ task, profiles, currentUserId, onClose, onSave, onAr
       <Dialog
         title={editing ? 'Görevi Düzenle' : 'Yeni Görev'}
         width={480}
-        onClose={onClose}
+        onClose={handleUserClose}
         footer={
           <>
             {editing && (
@@ -155,7 +193,7 @@ export function TaskModal({ task, profiles, currentUserId, onClose, onSave, onAr
                 Görevi Arşivle
               </Button>
             )}
-            <Button variant="outline" onClick={onClose} disabled={saving || archiving}>İptal</Button>
+            <Button variant="outline" onClick={handleUserClose} disabled={saving || archiving}>İptal</Button>
             <Button icon="check" onClick={handleSave} disabled={saving}>{saving ? 'Kaydediliyor…' : 'Kaydet'}</Button>
           </>
         }
@@ -200,6 +238,25 @@ export function TaskModal({ task, profiles, currentUserId, onClose, onSave, onAr
             <Field label="Not">
               <Textarea rows={2} value={form.note} placeholder="Not ekleyin (isteğe bağlı)" onChange={e => set('note', e.target.value)} />
             </Field>
+          </div>
+
+          <div className="col-2">
+            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Dosya Ekleri</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+              {attachments.map(a => (
+                <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--surface-2)' }}>
+                  <span style={{ flex: '0 0 auto', fontSize: 9.5, fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', padding: '3px 6px', borderRadius: 5, background: 'var(--primary-soft)', color: 'var(--primary)' }}>{fileExt(a.fileName) || 'dosya'}</span>
+                  <button onClick={() => downloadAtt(a)} title="İndir" style={{ flex: '1 1 auto', minWidth: 0, textAlign: 'left', border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: 13, fontWeight: 500, color: 'var(--foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.fileName}</button>
+                  <span style={{ flex: '0 0 auto', fontSize: 11.5, color: 'var(--muted-foreground)' }}>{fmtSize(a.fileSize)}</span>
+                  <button onClick={() => removeAtt(a)} title="Kaldır" style={{ flex: '0 0 auto', border: 'none', background: 'transparent', color: 'var(--muted-foreground)', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 2 }}>✕</button>
+                </div>
+              ))}
+              <input type="file" multiple ref={fileRef} onChange={onFilesPicked} accept=".pdf,.xls,.xlsx,.csv,.txt,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg,.gif,.svg,.webp,.zip,.rar" style={{ display: 'none' }} />
+              <button onClick={() => fileRef.current?.click()} disabled={uploading} title="Excel, PDF, Word, görsel ve diğer formatlar" style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 12px', borderRadius: 8, border: '1px dashed var(--border-strong)', background: 'var(--surface)', color: 'var(--muted-foreground)', fontSize: 12.5, fontWeight: 600, cursor: uploading ? 'default' : 'pointer' }}>
+                {uploading ? 'Yükleniyor…' : '📎 Dosya ekle'}
+              </button>
+              {attachError && <span style={{ fontSize: 12, color: 'var(--absent-fg)' }}>{attachError}</span>}
+            </div>
           </div>
 
           <div className="col-2">

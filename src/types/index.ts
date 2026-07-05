@@ -118,6 +118,17 @@ export interface TaskActivity {
   createdAt: string;
 }
 
+export interface TaskAttachment {
+  id: number;
+  taskId: number | null;     // null = taslak (henüz kaydedilmemiş görev)
+  storagePath: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string | null;
+  uploadedBy: string | null; // profiles.id
+  createdAt: string;
+}
+
 export interface MonthDay {
   n: number;
   wIdx: number;
