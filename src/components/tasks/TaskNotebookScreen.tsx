@@ -15,6 +15,8 @@ interface TaskNotebookScreenProps {
   tasks: Task[];
   profiles: Profile[];
   onToggleDone: (task: Task, done: boolean) => void;
+  onAdd: () => void;
+  onEdit: (task: Task) => void;
 }
 
 type TabId = 'tumu' | 'acik' | 'bugun' | 'gecikmis' | 'hafta' | 'rutinler' | 'tamamlanan';
@@ -61,7 +63,7 @@ function repeatLabel(t: Task): string | null {
   }
 }
 
-export function TaskNotebookScreen({ tasks, profiles, onToggleDone }: TaskNotebookScreenProps) {
+export function TaskNotebookScreen({ tasks, profiles, onToggleDone, onAdd, onEdit }: TaskNotebookScreenProps) {
   const [activeTab, setActiveTab] = useState<TabId>('tumu');
   const [query, setQuery] = useState('');
   const [personFilter, setPersonFilter] = useState<string | null>(null);
@@ -152,6 +154,9 @@ export function TaskNotebookScreen({ tasks, profiles, onToggleDone }: TaskNotebo
           <h1 className="page-title">Görev Defteri</h1>
           <p className="page-desc">Ekibin ortak görev ve rutin takibi</p>
         </div>
+        <div className="page-actions">
+          <Button icon="plus" onClick={onAdd}>Görev Ekle</Button>
+        </div>
       </div>
 
       <div className="stat-grid">
@@ -223,11 +228,11 @@ export function TaskNotebookScreen({ tasks, profiles, onToggleDone }: TaskNotebo
                       const rep = repeatLabel(t);
                       const assignee = nameOf(t.assigneeId);
                       return (
-                        <tr key={t.id}>
+                        <tr key={t.id} onClick={() => onEdit(t)} style={{ cursor: 'pointer' }}>
                           <td>
                             <button
                               aria-pressed={t.done}
-                              onClick={() => onToggleDone(t, !t.done)}
+                              onClick={e => { e.stopPropagation(); onToggleDone(t, !t.done); }}
                               title={t.done ? 'Tamamlandı' : 'Tamamlandı olarak işaretle'}
                               style={{
                                 width: 22, height: 22, borderRadius: 6, padding: 0, cursor: 'pointer',
@@ -270,7 +275,7 @@ export function TaskNotebookScreen({ tasks, profiles, onToggleDone }: TaskNotebo
                               }}><Icon name="users" size={14} /></span>
                             ) : (
                               <button
-                                onClick={() => t.assigneeId && filterByPerson(t.assigneeId)}
+                                onClick={e => { e.stopPropagation(); if (t.assigneeId) filterByPerson(t.assigneeId); }}
                                 title={assignee ? `${assignee} — görevlerini göster` : 'Atanmamış'}
                                 style={{ border: 'none', background: 'transparent', padding: 0, cursor: t.assigneeId ? 'pointer' : 'default' }}
                               >

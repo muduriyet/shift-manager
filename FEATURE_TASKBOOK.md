@@ -1,12 +1,12 @@
 # Görev Defteri — Ortak Görev / Yapılacaklar Takibi (Task Notebook)
 
 Son güncelleme: 2026-07-05
-Durum: **GELİŞTİRİLİYOR** — Sprint 1–2 tamamlandı ve doğrulandı; Sprint 3 (yazma + tekrar UI) sırada. Faz 1 kapsamı: çekirdek görev panosu + tekrarlayan (rutin) görevlerin otomatik yeniden açılması.
+Durum: **FAZ 1 TAMAMLANDI** — Sprint 1–3 tamamlandı ve uçtan uca doğrulandı (canlı DB'de). Çekirdek görev panosu + tekrarlayan rutinler canlıya hazır. Sonraki (ertelenen): S4 Yorum/Aktivite · S5 Dosya ekleri · S6 Dışa aktarma + öne çıkarma.
 
 İlerleme notu:
 - ✅ **Sprint 1 (Temel + tesisat):** `create_task_notebook.sql` (profiles + tasks + RLS + seed) canlıya uygulandı ve sertleştirildi (advisor temiz); tipler, `db.ts` veri katmanı, yönlendirme/menü + ekran iskeleti. `tsc` temiz. Doğrulandı: 6 seed rutini listelendi, tamamlandı işaretleme + tekrar üretimi (spawn-next: görev 1 → yarına yeni örnek) çalıştı; test artefaktı temizlendi.
 - ✅ **Sprint 2 (Okuma panosu):** istatistik kartları, sayaçlı sekmeler, Rutinler/Bu Hafta gruplama, arama (tr-locale), kişi filtresi çipi, sayfalama, boş durum. `tsc` temiz. Doğrulandı: istatistikler (Açık 6/Bugün 3/Gecikmiş 0), sekme sayaçları, Rutinler (Günlük 3/Haftalık 1/Aylık 2) + Bu Hafta (Bugün 3/İleri 3) gruplama, arama, boş durum. (Kişi filtresi + sayfalama seed all-team & <10 olduğu için Sprint 3'te canlı test edilecek.)
-- ⬜ **Sprint 3 (Yazma + tekrar):** görev ekle/düzenle/arşivle, tamamlandı işaretleme, atama/ortak görev/devral, tekrar eden görev üretimi. → **Faz 1 canlıya çıkar.**
+- ✅ **Sprint 3 (Yazma + tekrar):** TaskModal (ekle/düzenle), başlık/öncelik/tarih/tekrar/not, Ortak Görev + Devral, arşivle (onaylı soft-delete), satır→düzenle, Görev Ekle butonu. `tsc` temiz. Doğrulandı: oluştur (kişiye atanmış), kişi filtresi çipi, düzenle (öncelik + team toggle; updated_at trigger tetiklendi), arşivle (gizlendi, kayıt korundu), sayfalama (12 görev → Sayfa 1/2 → Sonraki). Test verisi temizlendi. (Devral tek kullanıcı olduğu için canlı test edilemedi; ≥2 kullanıcıda çalışır.) → **Faz 1 canlıya hazır.**
 - ⬜ **Sonraki (ertelenen):** Sprint 4 Yorum + Aktivite · Sprint 5 Dosya ekleri (Storage) · Sprint 6 Dışa aktarma + öne çıkarma.
 
 Bu dosya, Claude Design'da (`Shift-Manager UI Kit` → `templates/gorev-defteri`) tasarlanan **Görev Defteri** ekranının canlı uygulamaya entegrasyon spesifikasyonunu ve uygulama adımlarını tanımlar. Yaşayan (living) dokümandır; her sprint tamamlandıkça güncellenir.
@@ -205,8 +205,8 @@ export interface Task {
 | GD-0 | Veri temeli — migration, RLS, seed, tipler, db.ts | M | ✅ |
 | GD-1 | Yönlendirme + ekran iskeleti + veri yükleme | S | ✅ |
 | GD-2 | Görev panosu (okuma) — istatistik, sekmeler, gruplama, arama, filtre, sayfalama | L | ✅ |
-| GD-3 | Ekle/Düzenle/Arşivle + tamamlandı (yazma) | L | ⬜ |
-| GD-4 | Tekrarlayan görev otomatik yeniden açılma (spawn-next) | M | ⬜ |
+| GD-3 | Ekle/Düzenle/Arşivle + tamamlandı (yazma) | L | ✅ |
+| GD-4 | Tekrarlayan görev otomatik yeniden açılma (spawn-next) | M | ✅ |
 | GD-5 | Yorumlar + aktivite kaydı *(ertelendi)* | M | ⬜ |
 | GD-6 | Dosya ekleri (Supabase Storage) *(ertelendi)* | L | ⬜ |
 | GD-7 | Dışa aktarma (Excel/PDF) *(ertelendi)* | S–M | ⬜ |
