@@ -149,6 +149,30 @@ where not exists (select 1 from tasks);
 
 Öncelik/tekrar check değerleri Türkçe — proje konvansiyonu (`'Planlandı'`, `'Aktif'`, `'Geldi'`…) ile uyumlu.
 
+### Yorumlar + aktivite (`supabase/create_task_collab.sql`, S4)
+
+Görev başına yorum thread'i ve "kim ne yaptı" aktivite kaydı. Görev arşivlenince kalır; fiziksel silinirse cascade ile gider. RLS deseni tasks ile aynı (`for all to authenticated`).
+
+```sql
+create table if not exists task_comments (
+  id         bigint primary key generated always as identity,
+  task_id    bigint not null references tasks(id) on delete cascade,
+  author_id  uuid references profiles(id) on delete set null,
+  body       text not null,
+  created_at timestamptz not null default now()
+);
+create table if not exists task_activity (
+  id         bigint primary key generated always as identity,
+  task_id    bigint not null references tasks(id) on delete cascade,
+  actor_id   uuid references profiles(id) on delete set null,
+  action     text not null,   -- 'görevi oluşturdu', 'yorum ekledi', 'tamamlandı olarak işaretledi' …
+  created_at timestamptz not null default now()
+);
+-- her ikisinde: enable row level security + "Authenticated full access" (for all)
+```
+
+Aktivite **istemci tarafında** loglanır (`logTaskActivity`, best-effort — ana aksiyonu bloklamaz): oluştur / tamamla / yeniden aç / düzenle (team·devral·güncelle) / yorum ekle.
+
 ### TypeScript tipleri (`src/types/index.ts`)
 `snake_case` (DB) ↔ `camelCase` (TS) eşlemesi `Employee`/`Shift` desenini izler.
 
@@ -183,6 +207,22 @@ export interface Task {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface TaskComment {
+  id: number;
+  taskId: number;
+  authorId: string | null;   // profiles.id
+  body: string;
+  createdAt: string;
+}
+
+export interface TaskActivity {
+  id: number;
+  taskId: number;
+  actorId: string | null;    // profiles.id
+  action: string;            // 'görevi oluşturdu', 'yorum ekledi', …
+  createdAt: string;
+}
 ```
 
 `ViewId` union'ına `'gorev'` eklenir.
@@ -215,6 +255,8 @@ export interface Task {
 
 **GD-4 tekrar mantığı:** `setTaskDone(id, true)` içinde `repeat_kind !== 'none'` ise, örnek tamamlandı işaretlendikten (`done=true`, `done_at=now()`) sonra bir sonraki örnek eklenir — title/priority/note/assignee/team/repeat kopyalanır, `done=false`, `series_id = series_id ?? id`, `due_date =` kurala göre sonraki tarih (`daily +1g`, `weekly +7g`, `monthly +1ay`, `custom +N birim`), tamamlanan `due_date`'e (yoksa bugüne) göre. Tamamlanan örnekler **Tamamlanan** sekmesinde kalır.
 
+**GD-5 yorum/aktivite:** düzenle diyaloğu açılınca `fetchComments` + `fetchActivity` yüklenir. Yorum eklenince `task_comments`'a yazılır **ve** "yorum ekledi" aktivitesi loglanır. Diğer aksiyonlar (`createTask` → "görevi oluşturdu"; `setTaskDone` → "tamamlandı olarak işaretledi"/"görevi yeniden açtı"; düzenle → team/devral/güncelle) `logTaskActivity` ile en iyi çaba (best-effort) loglanır — aktivite yazımı başarısız olsa bile ana işlem bloklanmaz.
+
 ---
 
 ## 6. Sprint Planı
@@ -223,12 +265,12 @@ Tek geliştirici; "sprint" = takvim değil, **teslim edilebilir artış** (efor 
 
 | Sprint | Kalemler | Boyut | Hedef / teslim |
 | --- | --- | --- | --- |
-| **S1 · Temel + tesisat** | GD-0 + GD-1 | M | Tablolar + seed canlı; ekrana erişilir ve gerçek veri yüklenir |
-| **S2 · Okuma panosu** | GD-2 | L | Tasarımdaki okuma-yalnız pano tam |
-| **S3 · Yazma + tekrar** ➡️ *Faz 1 çıkar* | GD-3 + GD-4 | L | Tam işlevsel ortak pano; günlük rutin tamamlanınca yarınki kopya üretilir |
-| S4 · İşbirliği | GD-5 | M | Yorum thread + aktivite akışı |
-| S5 · Ekler | GD-6 | L | Storage bucket + RLS + `task_attachments`; yükle/listele/kaldır |
-| S6 · Dışa aktarma + öne çıkarma | GD-7 + GD-8 | M | Excel/PDF; rozet, Dashboard widget, gecikme bildirimi |
+| ✅ **S1 · Temel + tesisat** | GD-0 + GD-1 | M | Tablolar + seed canlı; ekrana erişilir ve gerçek veri yüklenir |
+| ✅ **S2 · Okuma panosu** | GD-2 | L | Tasarımdaki okuma-yalnız pano tam |
+| ✅ **S3 · Yazma + tekrar** ➡️ *Faz 1 çıktı* | GD-3 + GD-4 | L | Tam işlevsel ortak pano; günlük rutin tamamlanınca yarınki kopya üretilir |
+| ✅ **S4 · İşbirliği** | GD-5 | M | Yorum thread + aktivite akışı |
+| ⬜ S5 · Ekler | GD-6 | L | Storage bucket + RLS + `task_attachments`; yükle/listele/kaldır |
+| ⬜ S6 · Dışa aktarma + öne çıkarma | GD-7 + GD-8 | M | Excel/PDF; rozet, Dashboard widget, gecikme bildirimi |
 
 **Kritik yol:** S1 → S2 → S3 onaylı ürünü verir. S1–S3, ertelenen sprintlere bağlı değildir → Faz 1 çıkıp stabil kalabilir.
 
@@ -240,7 +282,8 @@ Tek geliştirici; "sprint" = takvim değil, **teslim edilebilir artış** (efor 
 2. **Uygulama:** `npm run dev`, giriş, kenar çubuğundan **Görev Defteri** (`preview_*` ile). `tsc -b` temiz.
 3. **GD-2/3:** görev oluştur (son tarihli ve tarihsiz) → liste + istatistik güncellenir; öncelik/tarih/atama düzenle; **Devral** bana atar; **Ortak Görev** team ikonu gösterir; kişi filtresi çipi; sekmeler (Bugün/Gecikmiş/Bu Hafta/Rutinler) yerel tarihe göre doğru gruplanır; arama + sayfalama; **arşivle-onay satırı gizler (`archived_at` set, satır kalır)**. Supabase'de satırlar `execute_sql` ile doğrulanır.
 4. **GD-4:** günlük seed rutini tamamla → **Tamamlanan**'a geçer ve `due_date = +1 gün`, aynı `series_id` ile yeni örnek belirir; iki satır kontrol edilir.
-5. **RLS:** oturumsuz istek 0 satır; oturumlu tam erişim — `auth-rls-live` ile tutarlı.
+5. **GD-5 (yorum/aktivite):** görevi düzenle → yorum yaz + **Ekle** → yorum kartı (ad/avatar/göreli zaman) belirir ve **Aktivite**'ye "yorum ekledi" düşer; `task_comments`/`task_activity` satırları `execute_sql` ile doğrulanır.
+6. **RLS:** oturumsuz istek 0 satır; oturumlu tam erişim — `auth-rls-live` ile tutarlı.
 
 ---
 
@@ -250,11 +293,11 @@ Tek geliştirici; "sprint" = takvim değil, **teslim edilebilir artış** (efor 
 | --- | --- |
 | `supabase/create_task_notebook.sql` | **yeni** — profiles + trigger/backfill + tasks + RLS + updated_at trigger + seed |
 | `supabase/create_task_collab.sql` | **yeni** — task_comments + task_activity + RLS (S4) |
-| `src/types/index.ts` | `Task`/`Profile`/`TaskPriority`/`RepeatKind`/`RepeatUnit`; `ViewId` += `'gorev'` |
-| `src/lib/db.ts` | profiles + tasks CRUD (`archiveTask`, `setTaskDone` tekrarlı) + mapper'lar |
-| `src/App.tsx` | profiles+tasks yükle; `currentUserId`; `case 'gorev'`; prop/handler geç |
+| `src/types/index.ts` | `Task`/`Profile`/`TaskPriority`/`RepeatKind`/`RepeatUnit` + `TaskComment`/`TaskActivity`; `ViewId` += `'gorev'` |
+| `src/lib/db.ts` | profiles + tasks CRUD (`archiveTask`, `setTaskDone` tekrarlı) + yorum/aktivite (`fetchComments`/`addComment`/`fetchActivity`/`logTaskActivity`) + mapper'lar |
+| `src/App.tsx` | profiles+tasks yükle; `currentUserId`; `case 'gorev'`; prop/handler geç; düzenlemede aktivite loglar |
 | `src/components/layout/Sidebar.tsx` | NAV girişi |
 | `src/components/tasks/TaskNotebookScreen.tsx` | **yeni** — pano (GD-1/2/3/4) |
-| `src/components/modals/TaskModal.tsx` | **yeni** — ekle/düzenle diyaloğu (GD-3) |
+| `src/components/modals/TaskModal.tsx` | **yeni** — ekle/düzenle diyaloğu (GD-3) + yorum thread'i & aktivite akışı (GD-5) |
 | `src/index.css` | göreve özel sınıflar |
 | `FEATURE_TASKBOOK.md` | **bu dosya** — yaşayan spec/durum |
