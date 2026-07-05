@@ -40,6 +40,12 @@ function ymdOffset(ymd: string, days: number): string {
   const dt = new Date(y, m - 1, d + days);
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
 }
+// Haftanın sonu (Pazar), yerel — Pazartesi başlangıçlı hafta (H2).
+function endOfWeekYmd(todayStr: string): string {
+  const [y, m, d] = todayStr.split('-').map(Number);
+  const dow = (new Date(y, m - 1, d).getDay() + 6) % 7; // Pzt=0..Paz=6
+  return ymdOffset(todayStr, 6 - dow);
+}
 function fmtDate(ymd: string): string {
   const [, m, d] = ymd.split('-').map(Number);
   return `${d} ${TR_MONTHS[m - 1]}`;
@@ -71,6 +77,7 @@ export function TaskNotebookScreen({ tasks, profiles, onToggleDone, onAdd, onEdi
 
   const today = todayYmd();
   const tomorrow = ymdOffset(today, 1);
+  const weekEnd = endOfWeekYmd(today);
   const nameOf = (id: string | null) => profiles.find(p => p.id === id)?.displayName ?? '';
 
   const isOverdue = (t: Task) => !t.done && t.dueDate != null && t.dueDate < today;
@@ -82,7 +89,7 @@ export function TaskNotebookScreen({ tasks, profiles, onToggleDone, onAdd, onEdi
   const cToday   = tasks.filter(isToday).length;
   const cOverdue = tasks.filter(isOverdue).length;
   const cDone    = tasks.filter(t => t.done).length;
-  const cRepeat  = tasks.filter(t => t.repeatKind !== 'none').length;
+  const cRepeat  = tasks.filter(t => !t.done && t.repeatKind !== 'none').length;
 
   const setTab = (id: string) => { setActiveTab(id as TabId); setPage(0); };
   const changeQuery = (v: string) => { setQuery(v); setPage(0); };
@@ -95,8 +102,8 @@ export function TaskNotebookScreen({ tasks, profiles, onToggleDone, onAdd, onEdi
       case 'acik':       return !t.done;
       case 'bugun':      return isToday(t);
       case 'gecikmis':   return isOverdue(t);
-      case 'rutinler':   return t.repeatKind !== 'none';
-      case 'hafta':      return !t.done;
+      case 'rutinler':   return !t.done && t.repeatKind !== 'none';
+      case 'hafta':      return !t.done && t.dueDate != null && t.dueDate >= today && t.dueDate <= weekEnd;
       case 'tamamlanan': return t.done;
       default:           return true; // tumu
     }
@@ -126,9 +133,9 @@ export function TaskNotebookScreen({ tasks, profiles, onToggleDone, onAdd, onEdi
       .map(k => ({ hasHeader: true, label: labels[k], icon: '↻', tasks: pagedTasks.filter(t => t.repeatKind === k) }))
       .filter(g => g.tasks.length > 0);
   } else if (activeTab === 'hafta') {
-    const labels: Record<string, string> = { overdue: 'Gecikmiş', today: 'Bugün', tomorrow: 'Yarın', later: 'İleri Tarih' };
-    const bucket = (t: Task) => isOverdue(t) ? 'overdue' : t.dueDate === today ? 'today' : t.dueDate === tomorrow ? 'tomorrow' : 'later';
-    groups = ['overdue', 'today', 'tomorrow', 'later']
+    const labels: Record<string, string> = { today: 'Bugün', tomorrow: 'Yarın', rest: 'Bu hafta' };
+    const bucket = (t: Task) => t.dueDate === today ? 'today' : t.dueDate === tomorrow ? 'tomorrow' : 'rest';
+    groups = ['today', 'tomorrow', 'rest']
       .map(k => ({ hasHeader: true, label: labels[k], icon: '', tasks: pagedTasks.filter(t => bucket(t) === k) }))
       .filter(g => g.tasks.length > 0);
   } else {

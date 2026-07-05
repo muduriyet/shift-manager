@@ -676,18 +676,27 @@ function formatYmd(d: Date): string {
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
+// Ay ekleme ay-sonu clamp'li (H1): hedef ayda orijinal gün yoksa ayın son gününe
+// sabitlenir. Örn. 31 Oca + 1 ay -> 28 Şub (setMonth taşması engellenir).
+function addMonthsClamped(base: Date, months: number): Date {
+  const day = base.getDate();
+  const target = new Date(base.getFullYear(), base.getMonth() + months, 1);
+  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+  target.setDate(Math.min(day, lastDay));
+  return target;
+}
+
 function nextDueDate(base: Date, kind: RepeatKind, n: number, unit: RepeatUnit): Date {
-  const d = new Date(base);
-  if (kind === 'daily') d.setDate(d.getDate() + 1);
-  else if (kind === 'weekly') d.setDate(d.getDate() + 7);
-  else if (kind === 'monthly') d.setMonth(d.getMonth() + 1);
-  else if (kind === 'custom') {
+  if (kind === 'daily')  { const d = new Date(base); d.setDate(d.getDate() + 1); return d; }
+  if (kind === 'weekly') { const d = new Date(base); d.setDate(d.getDate() + 7); return d; }
+  if (kind === 'monthly') return addMonthsClamped(base, 1);
+  if (kind === 'custom') {
     const k = Math.max(1, n);
-    if (unit === 'gün') d.setDate(d.getDate() + k);
-    else if (unit === 'hafta') d.setDate(d.getDate() + k * 7);
-    else if (unit === 'ay') d.setMonth(d.getMonth() + k);
+    if (unit === 'gün')   { const d = new Date(base); d.setDate(d.getDate() + k); return d; }
+    if (unit === 'hafta') { const d = new Date(base); d.setDate(d.getDate() + k * 7); return d; }
+    if (unit === 'ay')    return addMonthsClamped(base, k);
   }
-  return d;
+  return new Date(base);
 }
 
 export async function fetchTasks(): Promise<Task[]> {
@@ -780,7 +789,9 @@ export async function setTaskDone(task: Task, done: boolean, actorId: string | n
       repeat_unit: task.repeatUnit,
       series_id: task.seriesId ?? task.id,
     });
-    if (insErr) throw insErr;
+    // Duplicate guard (H3): eşzamanlı tamamlamada aynı seri+tarih için 2. insert'i
+    // partial unique index reddeder (23505); bunu yut, diğer hataları fırlat.
+    if (insErr && (insErr as { code?: string }).code !== '23505') throw insErr;
   }
 }
 

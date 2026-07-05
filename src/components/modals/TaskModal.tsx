@@ -48,8 +48,8 @@ interface TaskModalProps {
   profiles: Profile[];
   currentUserId: string | null;
   onClose: () => void;
-  onSave: (form: TaskForm, id: number | null) => void;
-  onArchive: (id: number) => void;
+  onSave: (form: TaskForm, id: number | null) => void | Promise<void>;
+  onArchive: (id: number) => void | Promise<void>;
 }
 
 export function TaskModal({ task, profiles, currentUserId, onClose, onSave, onArchive }: TaskModalProps) {
@@ -70,6 +70,9 @@ export function TaskModal({ task, profiles, currentUserId, onClose, onSave, onAr
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [activity, setActivity] = useState<TaskActivity[]>([]);
   const [newComment, setNewComment] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [commenting, setCommenting] = useState(false);
+  const [archiving, setArchiving] = useState(false);
 
   useEffect(() => {
     if (!task) return;
@@ -100,18 +103,28 @@ export function TaskModal({ task, profiles, currentUserId, onClose, onSave, onAr
 
   async function submitComment() {
     const text = newComment.trim();
-    if (!text || !task) return;
+    if (!text || !task || commenting) return;
+    setCommenting(true);
     try {
       await addComment(task.id, currentUserId, text);
       setNewComment('');
       const [c, a] = await Promise.all([fetchComments(task.id), fetchActivity(task.id)]);
       setComments(c); setActivity(a);
     } catch { /* sessizce geç */ }
+    finally { setCommenting(false); }
   }
 
-  function handleSave() {
+  async function doArchive() {
+    if (!task || archiving) return;
+    setArchiving(true);
+    try { await onArchive(task.id); }
+    finally { setArchiving(false); }
+  }
+
+  async function handleSave() {
     const title = form.title.trim();
     if (!title) { setError('Görev başlığı zorunludur'); return; }
+    if (saving) return;
     const repeatKind = SEL_TO_KIND[form.repeatSel];
     const payload: TaskForm = {
       title,
@@ -124,7 +137,9 @@ export function TaskModal({ task, profiles, currentUserId, onClose, onSave, onAr
       repeatN: repeatKind === 'custom' ? Math.max(1, parseInt(form.customN, 10) || 1) : 1,
       repeatUnit: repeatKind === 'custom' ? form.customUnit : 'gün',
     };
-    onSave(payload, task?.id ?? null);
+    setSaving(true);
+    try { await onSave(payload, task?.id ?? null); }
+    finally { setSaving(false); }
   }
 
   return (
@@ -136,12 +151,12 @@ export function TaskModal({ task, profiles, currentUserId, onClose, onSave, onAr
         footer={
           <>
             {editing && (
-              <Button variant="danger-ghost" onClick={() => setConfirmArchive(true)} style={{ marginRight: 'auto' }}>
+              <Button variant="danger-ghost" onClick={() => setConfirmArchive(true)} disabled={saving || archiving} style={{ marginRight: 'auto' }}>
                 Görevi Arşivle
               </Button>
             )}
-            <Button variant="outline" onClick={onClose}>İptal</Button>
-            <Button icon="check" onClick={handleSave}>Kaydet</Button>
+            <Button variant="outline" onClick={onClose} disabled={saving || archiving}>İptal</Button>
+            <Button icon="check" onClick={handleSave} disabled={saving}>{saving ? 'Kaydediliyor…' : 'Kaydet'}</Button>
           </>
         }
       >
@@ -232,17 +247,18 @@ export function TaskModal({ task, profiles, currentUserId, onClose, onSave, onAr
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <div style={{ flex: '1 1 auto', minWidth: 0 }}>
-                  <Input value={newComment} placeholder="Yorum yazın..." onChange={e => setNewComment(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submitComment(); } }} />
+                  <Input value={newComment} placeholder="Yorum yazın..." disabled={commenting} onChange={e => setNewComment(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submitComment(); } }} />
                 </div>
-                <Button variant="outline" onClick={submitComment}>Ekle</Button>
+                <Button variant="outline" onClick={submitComment} disabled={commenting}>Ekle</Button>
               </div>
             </div>
           )}
 
-          {editing && activity.length > 0 && (
+          {editing && (
             <div className="col-2">
               <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Aktivite</span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+                {activity.length === 0 && <span style={{ fontSize: 12.5, color: 'var(--muted-foreground)' }}>Henüz aktivite yok.</span>}
                 {activity.slice(0, 6).map(a => (
                   <div key={a.id} style={{ display: 'flex', alignItems: 'baseline', gap: 7, fontSize: 12.5, color: 'var(--muted-foreground)' }}>
                     <span style={{ color: 'var(--border-strong)' }}>•</span>
@@ -263,8 +279,8 @@ export function TaskModal({ task, profiles, currentUserId, onClose, onSave, onAr
           onClose={() => setConfirmArchive(false)}
           footer={
             <>
-              <Button variant="outline" onClick={() => setConfirmArchive(false)}>Hayır</Button>
-              <Button variant="danger-ghost" onClick={() => { if (task) onArchive(task.id); }}>Evet, Arşivle</Button>
+              <Button variant="outline" onClick={() => setConfirmArchive(false)} disabled={archiving}>Hayır</Button>
+              <Button variant="danger-ghost" onClick={doArchive} disabled={archiving}>{archiving ? 'Arşivleniyor…' : 'Evet, Arşivle'}</Button>
             </>
           }
         >
