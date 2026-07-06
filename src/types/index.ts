@@ -20,7 +20,7 @@ export type RoleName = string;
 export type ShiftCodeKey = 'S' | 'Ö' | 'G' | 'Öz' | 'İ' | 'Yİ' | 'Üİ' | 'İs' | '-';
 export type ShiftStatus = 'Planlandı' | 'Geldi' | 'Gelmedi';
 export type EmployeeStatus = 'Aktif' | 'Pasif';
-export type ViewId = 'cizelge' | 'personeller' | 'gunluk' | 'raporlar' | 'ayarlar' | 'satis';
+export type ViewId = 'cizelge' | 'personeller' | 'gunluk' | 'raporlar' | 'ayarlar' | 'satis' | 'gorev';
 export type ScheduleMode = 'hafta' | 'ay';
 
 export interface ShiftCodeDef {
@@ -67,6 +67,66 @@ export interface Shift {
   dept: DepartmentName;
   status: ShiftStatus;
   note: string;
+}
+
+// ---- Görev Defteri (Task Notebook) ----
+export type TaskPriority = 'Yüksek' | 'Orta' | 'Düşük';
+export type RepeatKind = 'none' | 'daily' | 'weekly' | 'monthly' | 'custom';
+export type RepeatUnit = 'gün' | 'hafta' | 'ay';
+
+// Giriş yapan (ofis) kullanıcı dizini — auth.users'a bağlı; atama + yorum/aktivite yazarı kaynağı.
+export interface Profile {
+  id: string;            // auth uid (uuid)
+  username: string;
+  displayName: string;
+  isActive: boolean;
+}
+
+export interface Task {
+  id: number;
+  title: string;
+  note: string;
+  priority: TaskPriority;
+  dueDate: string | null;      // YYYY-MM-DD; null = backlog / "bir gün"
+  done: boolean;
+  doneAt: string | null;       // ISO timestamp
+  isTeam: boolean;
+  assigneeId: string | null;   // profiles.id; null = ortak/atanmamış
+  createdBy: string | null;    // profiles.id
+  repeatKind: RepeatKind;
+  repeatN: number;
+  repeatUnit: RepeatUnit;
+  seriesId: number | null;
+  archivedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TaskComment {
+  id: number;
+  taskId: number;
+  authorId: string | null;   // profiles.id
+  body: string;
+  createdAt: string;
+}
+
+export interface TaskActivity {
+  id: number;
+  taskId: number;
+  actorId: string | null;    // profiles.id
+  action: string;            // ör. 'görevi oluşturdu', 'yorum ekledi'
+  createdAt: string;
+}
+
+export interface TaskAttachment {
+  id: number;
+  taskId: number | null;     // null = taslak (henüz kaydedilmemiş görev)
+  storagePath: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string | null;
+  uploadedBy: string | null; // profiles.id
+  createdAt: string;
 }
 
 export interface MonthDay {

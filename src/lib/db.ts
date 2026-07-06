@@ -5,6 +5,7 @@ import type {
   Station, Department, Role,
   SalesImportConfig, SalesConfigStatus, SalesMapping, SalesDailyReport,
   SalesImportScope, SalesReportValues, SalesImportApplyResult, SalesDailyView,
+  Task, TaskPriority, RepeatKind, RepeatUnit, Profile, TaskComment, TaskActivity, TaskAttachment,
 } from '../types';
 
 const supabase = () => getSupabaseClient();
@@ -589,4 +590,305 @@ export async function applySalesImport(input: SalesImportApplyInput): Promise<Sa
     action: res.action as 'insert' | 'update',
     changedFields: res.changed_fields ?? {},
   };
+}
+
+// ---- Görev Defteri: profiles ----
+
+interface ProfileRow { id: string; username: string; display_name: string; is_active: boolean; }
+
+function toProfile(r: ProfileRow): Profile {
+  return { id: r.id, username: r.username, displayName: r.display_name, isActive: r.is_active };
+}
+
+// Giriş yapan kullanıcı dizini (atama listesi + ad/avatar). Tümü çekilir; aktif
+// süzme UI'da yapılır (pasif bir atanan hâlâ adıyla gösterilebilsin).
+export async function fetchProfiles(): Promise<Profile[]> {
+  const { data, error } = await supabase().from('profiles').select('*').order('display_name');
+  if (error) throw error;
+  return (data as ProfileRow[]).map(toProfile);
+}
+
+// ---- Görev Defteri: tasks ----
+
+interface TaskRow {
+  id: number;
+  title: string;
+  note: string;
+  priority: string;
+  due_date: string | null;
+  done: boolean;
+  done_at: string | null;
+  is_team: boolean;
+  assignee_id: string | null;
+  created_by: string | null;
+  repeat_kind: string;
+  repeat_n: number;
+  repeat_unit: string;
+  series_id: number | null;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+function toTask(r: TaskRow): Task {
+  return {
+    id: r.id,
+    title: r.title,
+    note: r.note,
+    priority: r.priority as TaskPriority,
+    dueDate: r.due_date,
+    done: r.done,
+    doneAt: r.done_at,
+    isTeam: r.is_team,
+    assigneeId: r.assignee_id,
+    createdBy: r.created_by,
+    repeatKind: r.repeat_kind as RepeatKind,
+    repeatN: r.repeat_n,
+    repeatUnit: r.repeat_unit as RepeatUnit,
+    seriesId: r.series_id,
+    archivedAt: r.archived_at,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+export interface TaskForm {
+  title: string;
+  note: string;
+  priority: TaskPriority;
+  dueDate: string | null;   // YYYY-MM-DD; null = backlog
+  isTeam: boolean;
+  assigneeId: string | null;
+  repeatKind: RepeatKind;
+  repeatN: number;
+  repeatUnit: RepeatUnit;
+}
+
+// Yerel (TR) tarih aritmetiği — 'YYYY-MM-DD' string'i yerel gece yarısı olarak parse
+// edilir (new Date('YYYY-MM-DD') UTC parse eder → gün kayması olur, ondan kaçınılır).
+function parseYmd(s: string): Date {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+function formatYmd(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+// Ay ekleme ay-sonu clamp'li (H1): hedef ayda orijinal gün yoksa ayın son gününe
+// sabitlenir. Örn. 31 Oca + 1 ay -> 28 Şub (setMonth taşması engellenir).
+function addMonthsClamped(base: Date, months: number): Date {
+  const day = base.getDate();
+  const target = new Date(base.getFullYear(), base.getMonth() + months, 1);
+  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+  target.setDate(Math.min(day, lastDay));
+  return target;
+}
+
+function nextDueDate(base: Date, kind: RepeatKind, n: number, unit: RepeatUnit): Date {
+  if (kind === 'daily')  { const d = new Date(base); d.setDate(d.getDate() + 1); return d; }
+  if (kind === 'weekly') { const d = new Date(base); d.setDate(d.getDate() + 7); return d; }
+  if (kind === 'monthly') return addMonthsClamped(base, 1);
+  if (kind === 'custom') {
+    const k = Math.max(1, n);
+    if (unit === 'gün')   { const d = new Date(base); d.setDate(d.getDate() + k); return d; }
+    if (unit === 'hafta') { const d = new Date(base); d.setDate(d.getDate() + k * 7); return d; }
+    if (unit === 'ay')    return addMonthsClamped(base, k);
+  }
+  return new Date(base);
+}
+
+export async function fetchTasks(): Promise<Task[]> {
+  const { data, error } = await supabase()
+    .from('tasks')
+    .select('*')
+    .is('archived_at', null)
+    .order('id');
+  if (error) throw error;
+  return (data as TaskRow[]).map(toTask);
+}
+
+export async function createTask(form: TaskForm, createdBy: string | null): Promise<Task> {
+  const { data, error } = await supabase()
+    .from('tasks')
+    .insert({
+      title: form.title,
+      note: form.note,
+      priority: form.priority,
+      due_date: form.dueDate,
+      is_team: form.isTeam,
+      assignee_id: form.assigneeId,
+      created_by: createdBy,
+      repeat_kind: form.repeatKind,
+      repeat_n: form.repeatN,
+      repeat_unit: form.repeatUnit,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  const task = toTask(data as TaskRow);
+  await logTaskActivity(task.id, createdBy, 'görevi oluşturdu');
+  return task;
+}
+
+export async function updateTask(id: number, form: TaskForm): Promise<Task> {
+  const { data, error } = await supabase()
+    .from('tasks')
+    .update({
+      title: form.title,
+      note: form.note,
+      priority: form.priority,
+      due_date: form.dueDate,
+      is_team: form.isTeam,
+      assignee_id: form.assigneeId,
+      repeat_kind: form.repeatKind,
+      repeat_n: form.repeatN,
+      repeat_unit: form.repeatUnit,
+    })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return toTask(data as TaskRow);
+}
+
+// Soft delete (D6): satırı silmez, archived_at doldurur; fetchTasks bunları süzer.
+export async function archiveTask(id: number): Promise<void> {
+  const { error } = await supabase()
+    .from('tasks')
+    .update({ archived_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+// Tamamlandı işaretleme + tekrar (GD-4/D5): tekrarlayan görev tamamlanınca o örnek
+// "done" kalır (Tamamlanan'da), bir sonraki örnek yeni satır olarak eklenir. series_id
+// örnekleri zincirler. Tüm alanları hesaba katmak için tam Task nesnesi alınır.
+export async function setTaskDone(task: Task, done: boolean, actorId: string | null): Promise<void> {
+  const { error } = await supabase()
+    .from('tasks')
+    .update({ done, done_at: done ? new Date().toISOString() : null })
+    .eq('id', task.id);
+  if (error) throw error;
+  await logTaskActivity(task.id, actorId, done ? 'tamamlandı olarak işaretledi' : 'görevi yeniden açtı');
+
+  if (done && task.repeatKind !== 'none') {
+    const base = task.dueDate ? parseYmd(task.dueDate) : new Date();
+    const next = formatYmd(nextDueDate(base, task.repeatKind, task.repeatN, task.repeatUnit));
+    const { error: insErr } = await supabase().from('tasks').insert({
+      title: task.title,
+      note: task.note,
+      priority: task.priority,
+      due_date: next,
+      is_team: task.isTeam,
+      assignee_id: task.assigneeId,
+      created_by: task.createdBy,
+      repeat_kind: task.repeatKind,
+      repeat_n: task.repeatN,
+      repeat_unit: task.repeatUnit,
+      series_id: task.seriesId ?? task.id,
+    });
+    // Duplicate guard (H3): eşzamanlı tamamlamada aynı seri+tarih için 2. insert'i
+    // partial unique index reddeder (23505); bunu yut, diğer hataları fırlat.
+    if (insErr && (insErr as { code?: string }).code !== '23505') throw insErr;
+  }
+}
+
+// ---- Görev Defteri: yorumlar + aktivite (GD-5) ----
+
+interface CommentRow { id: number; task_id: number; author_id: string | null; body: string; created_at: string; }
+function toComment(r: CommentRow): TaskComment {
+  return { id: r.id, taskId: r.task_id, authorId: r.author_id, body: r.body, createdAt: r.created_at };
+}
+
+interface ActivityRow { id: number; task_id: number; actor_id: string | null; action: string; created_at: string; }
+function toActivity(r: ActivityRow): TaskActivity {
+  return { id: r.id, taskId: r.task_id, actorId: r.actor_id, action: r.action, createdAt: r.created_at };
+}
+
+export async function fetchComments(taskId: number): Promise<TaskComment[]> {
+  const { data, error } = await supabase().from('task_comments').select('*').eq('task_id', taskId).order('created_at');
+  if (error) throw error;
+  return (data as CommentRow[]).map(toComment);
+}
+
+export async function fetchActivity(taskId: number): Promise<TaskActivity[]> {
+  const { data, error } = await supabase().from('task_activity').select('*').eq('task_id', taskId).order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data as ActivityRow[]).map(toActivity);
+}
+
+// Aktivite kaydı best-effort: ana aksiyonu bloklamasın (hata olursa yalnızca uyarır).
+export async function logTaskActivity(taskId: number, actorId: string | null, action: string): Promise<void> {
+  const { error } = await supabase().from('task_activity').insert({ task_id: taskId, actor_id: actorId, action });
+  if (error) console.warn('Aktivite kaydı eklenemedi:', error);
+}
+
+export async function addComment(taskId: number, authorId: string | null, body: string): Promise<void> {
+  const { error } = await supabase().from('task_comments').insert({ task_id: taskId, author_id: authorId, body });
+  if (error) throw error;
+  await logTaskActivity(taskId, authorId, 'yorum ekledi');
+}
+
+// ---- Görev Defteri: dosya ekleri (GD-6) ----
+
+const ATTACH_BUCKET = 'task-attachments';
+
+interface AttachmentRow {
+  id: number; task_id: number | null; storage_path: string; file_name: string;
+  file_size: number; mime_type: string | null; uploaded_by: string | null; created_at: string;
+}
+function toAttachment(r: AttachmentRow): TaskAttachment {
+  return {
+    id: r.id, taskId: r.task_id, storagePath: r.storage_path, fileName: r.file_name,
+    fileSize: r.file_size, mimeType: r.mime_type, uploadedBy: r.uploaded_by, createdAt: r.created_at,
+  };
+}
+
+export async function fetchAttachments(taskId: number): Promise<TaskAttachment[]> {
+  const { data, error } = await supabase().from('task_attachments').select('*').eq('task_id', taskId).order('created_at');
+  if (error) throw error;
+  return (data as AttachmentRow[]).map(toAttachment);
+}
+
+// Dosyayı Storage'a yükler + metadata satırı ekler. taskId null → taslak
+// (görev kaydında linkAttachments ile bağlanır; iptalde removeAttachment ile silinir).
+export async function uploadAttachment(taskId: number | null, file: File, uploadedBy: string | null): Promise<TaskAttachment> {
+  const safeName = file.name.replace(/[^\w.\-]+/g, '_');
+  const prefix = taskId != null ? `tasks/${taskId}` : 'drafts';
+  const path = `${prefix}/${crypto.randomUUID()}-${safeName}`;
+  const { error: upErr } = await supabase().storage.from(ATTACH_BUCKET).upload(path, file, { contentType: file.type || undefined, upsert: false });
+  if (upErr) throw upErr;
+  const { data, error } = await supabase().from('task_attachments').insert({
+    task_id: taskId,
+    storage_path: path,
+    file_name: file.name,
+    file_size: file.size,
+    mime_type: file.type || null,
+    uploaded_by: uploadedBy,
+  }).select().single();
+  if (error) throw error;
+  return toAttachment(data as AttachmentRow);
+}
+
+// Taslak yüklemeleri (task_id=null) yeni göreve bağlar.
+export async function linkAttachments(ids: number[], taskId: number): Promise<void> {
+  if (ids.length === 0) return;
+  const { error } = await supabase().from('task_attachments').update({ task_id: taskId }).in('id', ids);
+  if (error) throw error;
+}
+
+// Private bucket → kısa ömürlü (5 dk) signed URL ile indirme.
+export async function attachmentSignedUrl(path: string): Promise<string> {
+  const { data, error } = await supabase().storage.from(ATTACH_BUCKET).createSignedUrl(path, 300);
+  if (error) throw error;
+  return data.signedUrl;
+}
+
+export async function removeAttachment(id: number, path: string): Promise<void> {
+  const { error: sErr } = await supabase().storage.from(ATTACH_BUCKET).remove([path]);
+  if (sErr) throw sErr;
+  const { error } = await supabase().from('task_attachments').delete().eq('id', id);
+  if (error) throw error;
 }

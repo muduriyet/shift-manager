@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, lazy, Suspense } from 'react';
-import type { ViewId, ScheduleMode, Employee, Shift, ShiftStatus, ShiftCodeKey, StationName, DepartmentName, RoleName, Station, Department, Role, SalesImportConfig } from './types';
+import type { ViewId, ScheduleMode, Employee, Shift, ShiftStatus, ShiftCodeKey, StationName, DepartmentName, RoleName, Station, Department, Role, SalesImportConfig, Task, Profile } from './types';
 import { SHIFT_CODES, WORK_CODES, isWithinEmployment } from './constants';
 import {
   fetchEmployees, fetchShifts,
@@ -9,7 +9,9 @@ import {
   fetchDepartments, createDepartment, deleteDepartment,
   fetchRoles, createRole, deleteRole,
   fetchSalesConfigs,
+  fetchTasks, fetchProfiles, setTaskDone, createTask, updateTask, archiveTask, logTaskActivity, linkAttachments,
 } from './lib/db';
+import type { TaskForm } from './lib/db';
 import { isSupabaseConfigError, getCurrentSession, onAuthChange, signOut, emailToUsername } from './lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 import { LoginScreen } from './components/auth/LoginScreen';
@@ -19,6 +21,8 @@ import { EmployeesScreen } from './components/employees/EmployeesScreen';
 import { DailyScreen } from './components/daily/DailyScreen';
 import { ReportsScreen } from './components/reports/ReportsScreen';
 import { SettingsScreen } from './components/settings/SettingsScreen';
+import { TaskNotebookScreen } from './components/tasks/TaskNotebookScreen';
+import { TaskModal } from './components/modals/TaskModal';
 import { ShiftModal } from './components/modals/ShiftModal';
 import { EmployeeModal } from './components/modals/EmployeeModal';
 import { ScheduleImportModal } from './components/modals/ScheduleImportModal';
@@ -62,7 +66,7 @@ interface EmployeeFormData {
 
 const DEFAULT_VIEW: ViewId = 'cizelge';
 const DEFAULT_SCHEDULE_MODE: ScheduleMode = 'ay';
-const VIEW_IDS: readonly ViewId[] = ['cizelge', 'personeller', 'gunluk', 'raporlar', 'ayarlar', 'satis'];
+const VIEW_IDS: readonly ViewId[] = ['cizelge', 'personeller', 'gunluk', 'gorev', 'raporlar', 'ayarlar', 'satis'];
 const SCHEDULE_MODES: readonly ScheduleMode[] = ['hafta', 'ay'];
 
 function isViewId(value: string | null): value is ViewId {
@@ -135,6 +139,8 @@ export default function App() {
   const [employees,   setEmployees]   = useState<Employee[]>([]);
   const [shifts,      setShifts]      = useState<Shift[]>([]);
   const [salesConfigs, setSalesConfigs] = useState<SalesImportConfig[]>([]);
+  const [tasks,       setTasks]       = useState<Task[]>([]);
+  const [profiles,    setProfiles]    = useState<Profile[]>([]);
   const [activeMonth, setActiveMonth] = useState<string>(todayYearMonth);
   const [loading,     setLoading]     = useState(true);
   const [loadError,   setLoadError]   = useState<string | null>(null);
@@ -144,6 +150,8 @@ export default function App() {
   const [shiftToEdit,    setShiftToEdit]    = useState<Shift | null>(null);
   const [empModalOpen,   setEmpModalOpen]   = useState(false);
   const [empToEdit,      setEmpToEdit]      = useState<Employee | null>(null);
+  const [taskModalOpen,  setTaskModalOpen]  = useState(false);
+  const [taskToEdit,     setTaskToEdit]     = useState<Task | null>(null);
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [drawer, setDrawer] = useState(false);
@@ -165,6 +173,7 @@ export default function App() {
         // SIGNED_OUT / token yenilenemedi: bellekteki veriyi temizle, login'e dön.
         setEmployees([]); setShifts([]);
         setStations([]); setDepartments([]); setRoles([]); setSalesConfigs([]);
+        setTasks([]); setProfiles([]);
         setLoadError(null); setLoading(true);
       }
     });
@@ -180,8 +189,9 @@ export default function App() {
     setLoading(true);
     async function load() {
       try {
-        const [sts, depts, rls, emps, shfts, sconfigs] = await Promise.all([
+        const [sts, depts, rls, emps, shfts, sconfigs, tsks, profs] = await Promise.all([
           fetchStations(), fetchDepartments(), fetchRoles(), fetchEmployees(), fetchShifts(), fetchSalesConfigs(),
+          fetchTasks(), fetchProfiles(),
         ]);
         if (!active) return;
         setStations(sts);
@@ -190,6 +200,8 @@ export default function App() {
         setEmployees(emps);
         setShifts(shfts);
         setSalesConfigs(sconfigs);
+        setTasks(tsks);
+        setProfiles(profs);
       } catch (err) {
         console.error('Veri yüklenemedi:', err);
         if (active) setLoadError(loadErrorMessage(err));
@@ -404,6 +416,53 @@ export default function App() {
     }
   }
 
+  async function handleToggleTaskDone(task: Task, done: boolean) {
+    try {
+      await setTaskDone(task, done, userId);
+      // Tekrarlayan görev tamamlanınca sunucu yeni bir örnek ekleyebilir → taze çek.
+      setTasks(await fetchTasks());
+    } catch {
+      toast('Görev güncellenemedi');
+    }
+  }
+
+  async function handleSaveTask(form: TaskForm, id: number | null, draftAttachmentIds: number[] = []) {
+    try {
+      if (id !== null) {
+        await updateTask(id, form);
+        const prev = taskToEdit;
+        if (prev) {
+          let action = 'görevi güncelledi';
+          if (form.isTeam !== prev.isTeam) action = form.isTeam ? 'görevi ortak göreve çevirdi' : 'görevi kişiye atadı';
+          else if ((form.assigneeId ?? null) !== (prev.assigneeId ?? null)) action = 'görevi devraldı';
+          await logTaskActivity(id, userId, action);
+        }
+        toast('Görev güncellendi');
+      } else {
+        const created = await createTask(form, userId);
+        if (draftAttachmentIds.length) await linkAttachments(draftAttachmentIds, created.id);
+        toast('Yeni görev eklendi');
+      }
+      setTasks(await fetchTasks());
+      setTaskModalOpen(false);
+      setTaskToEdit(null);
+    } catch {
+      toast('Görev kaydedilemedi, tekrar deneyin');
+    }
+  }
+
+  async function handleArchiveTask(id: number) {
+    try {
+      await archiveTask(id);
+      setTasks(await fetchTasks());
+      setTaskModalOpen(false);
+      setTaskToEdit(null);
+      toast('Görev arşivlendi');
+    } catch {
+      toast('Görev arşivlenemedi');
+    }
+  }
+
   async function handleApplyScheduleImport(plan: ScheduleImportPlan): Promise<ScheduleImportApplyResult> {
     const result: ScheduleImportApplyResult = {
       created: 0,
@@ -560,6 +619,17 @@ export default function App() {
         />
       );
       break;
+    case 'gorev':
+      screen = (
+        <TaskNotebookScreen
+          tasks={tasks}
+          profiles={profiles}
+          onToggleDone={handleToggleTaskDone}
+          onAdd={() => { setTaskToEdit(null); setTaskModalOpen(true); }}
+          onEdit={t => { setTaskToEdit(t); setTaskModalOpen(true); }}
+        />
+      );
+      break;
     case 'raporlar':
       screen = <ReportsScreen employees={employees} shifts={shifts} stationNames={stationNames} deptNames={deptNames} />;
       break;
@@ -633,6 +703,16 @@ export default function App() {
           roleNames={roleNames}
           onClose={() => { setEmpModalOpen(false); setEmpToEdit(null); }}
           onSave={(form, id) => handleSaveEmployee(form as EmployeeFormData, id)}
+        />
+      )}
+      {taskModalOpen && (
+        <TaskModal
+          task={taskToEdit}
+          profiles={profiles}
+          currentUserId={userId}
+          onClose={() => { setTaskModalOpen(false); setTaskToEdit(null); }}
+          onSave={handleSaveTask}
+          onArchive={handleArchiveTask}
         />
       )}
       {importModalOpen && (
