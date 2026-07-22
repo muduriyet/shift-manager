@@ -1,0 +1,145 @@
+{
+  "sourceWorkbook": "C:/Users/mehme/OneDrive/Desktop/coskun_petrol_pos_envanteri_renkli.xlsx",
+  "sourceSheet": "POS Envanteri",
+  "totals": {
+    "posCount": 38,
+    "activeCount": 22,
+    "passiveCount": 16,
+    "setupPendingCount": 4
+  },
+  "items": [
+    {
+      "station": "Ümraniye",
+      "department": "Akaryakıt",
+      "provider": "Halkbank",
+      "posCount": 3,
+      "activeCount": 0,
+      "passiveCount": 3,
+      "setupPendingCount": 0,
+      "commissionRate": "%2,99",
+      "deviceType": "Fiziksel POS — Bankaya ait",
+      "note": "5 fiziksel cihazın 3 adedi"
+    },
+    {
+      "station": "Ümraniye",
+      "department": "Akaryakıt",
+      "provider": "Halkbank",
+      "posCount": 2,
+      "activeCount": 0,
+      "passiveCount": 2,
+      "setupPendingCount": 0,
+      "commissionRate": "%0",
+      "deviceType": "Fiziksel POS — Bankaya ait",
+      "note": "5 fiziksel cihazın 2 adedi"
+    },
+    {
+      "station": "Ümraniye",
+      "department": "Akaryakıt",
+      "provider": "Halköde",
+      "posCount": 5,
+      "activeCount": 2,
+      "passiveCount": 3,
+      "setupPendingCount": 1,
+      "commissionRate": "%1,99",
+      "deviceType": "• 3 fiziksel POS — Bankaya ait\n• 1 dijital POS (Beko 400TR) — Coşkun Petrol'e ait\n• 1 Beko 430TR — Kurulum yapılacak",
+      "note": "Tüm cihazlar %1,99 komisyon ile çalışacak"
+    },
+    {
+      "station": "Ümraniye",
+      "department": "Akaryakıt",
+      "provider": "Vakıfbank",
+      "posCount": 5,
+      "activeCount": 2,
+      "passiveCount": 3,
+      "setupPendingCount": 1,
+      "commissionRate": "Ort. %2,95",
+      "deviceType": "• 3 fiziksel POS — Bankaya ait\n• 1 dijital POS (Beko 400TR) — Coşkun Petrol'e ait\n• 1 Beko 430TR — Kurulum yapılacak",
+      "note": "Tüm cihazlar ortalama %2,95 komisyon ile çalışacak"
+    },
+    {
+      "station": "Ümraniye",
+      "department": "Market",
+      "provider": "Halkbank",
+      "posCount": 2,
+      "activeCount": 2,
+      "passiveCount": 0,
+      "setupPendingCount": 0,
+      "commissionRate": "%0",
+      "deviceType": "Dijital POS — Market yazarkasa üzerinde",
+      "note": null
+    },
+    {
+      "station": "Ümraniye",
+      "department": "Market",
+      "provider": "Türkiye Finans",
+      "posCount": 2,
+      "activeCount": 2,
+      "passiveCount": 0,
+      "setupPendingCount": 0,
+      "commissionRate": "%0",
+      "deviceType": "Dijital POS — Market yazarkasa üzerinde",
+      "note": null
+    },
+    {
+      "station": "Ümraniye",
+      "department": "Market",
+      "provider": "Kuveyt Türk",
+      "posCount": 2,
+      "activeCount": 2,
+      "passiveCount": 0,
+      "setupPendingCount": 0,
+      "commissionRate": "%0",
+      "deviceType": "Dijital POS — Market yazarkasa üzerinde",
+      "note": null
+    },
+    {
+      "station": "Şile",
+      "department": "Akaryakıt",
+      "provider": "Ziraat Bankası",
+      "posCount": 9,
+      "activeCount": 6,
+      "passiveCount": 3,
+      "setupPendingCount": 1,
+      "commissionRate": "%0",
+      "deviceType": "• 3 fiziksel POS — Bankaya ait\n• 4 pompa yazarkasa (dijital)\n• 1 dijital POS (Beko 400TR) — Coşkun Petrol'e ait\n• 1 Beko 430TR — Kurulum yapılacak",
+      "note": "Tüm cihazlar %0 komisyon ile çalışacak"
+    },
+    {
+      "station": "Şile",
+      "department": "Akaryakıt",
+      "provider": "Halkbank",
+      "posCount": 4,
+      "activeCount": 2,
+      "passiveCount": 2,
+      "setupPendingCount": 1,
+      "commissionRate": "%0",
+      "deviceType": "• 2 fiziksel POS — Bankaya ait\n• 1 dijital POS (Beko 400TR) — Coşkun Petrol'e ait\n• 1 Beko 430TR — Kurulum yapılacak",
+      "note": "Tüm cihazlar %0 komisyon ile çalışacak"
+    },
+    {
+      "station": "Şile",
+      "department": "Market",
+      "provider": "Halkbank",
+      "posCount": 2,
+      "activeCount": 2,
+      "passiveCount": 0,
+      "setupPendingCount": 0,
+      "commissionRate": "%0",
+      "deviceType": "Dijital POS — Market yazarkasa üzerinde",
+      "note": null
+    },
+    {
+      "station": "Şile",
+      "department": "Market",
+      "provider": "Türkiye Finans",
+      "posCount": 2,
+      "activeCount": 2,
+      "passiveCount": 0,
+      "setupPendingCount": 0,
+      "commissionRate": "%0",
+      "deviceType": "Dijital POS — Market yazarkasa üzerinde",
+      "note": null
+    }
+  ]
+}
+
