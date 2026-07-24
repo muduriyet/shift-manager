@@ -3,6 +3,10 @@ dist/
 .env.local
 .env*.local
 *.local
+.DS_Store
+
+# MCP config — Supabase personal access token satır-içi tutulur, ASLA commit edilmez
+.mcp.json
 
 .vercel
 tsconfig.tsbuildinfo
