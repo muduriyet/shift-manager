@@ -24,6 +24,7 @@
   --plan-bg:#eff6ff; --plan-fg:#1d4ed8; --plan-bd:#bfdbfe; --plan-dot:#3b82f6;
   --came-bg:#ecfdf5; --came-fg:#047857; --came-bd:#a7f3d0; --came-dot:#10b981;
   --absent-bg:#fef2f2; --absent-fg:#b91c1c; --absent-bd:#fecaca; --absent-dot:#ef4444;
+  --late-bg:#fffbeb; --late-fg:#b45309; --late-bd:#fde68a; --late-dot:#f59e0b;
 
   --radius: 8px;
   --radius-sm: 6px;
@@ -178,6 +179,7 @@ input, select, textarea { font-family: inherit; }
 .badge-absent { background: var(--absent-bg); color: var(--absent-fg); border-color: var(--absent-bd); }
 .badge-absent .dot { background: var(--absent-dot); }
 .badge-active  { background: var(--came-bg); color: var(--came-fg); border-color: var(--came-bd); }
+.badge-active  .dot { background: var(--came-dot); }
 .badge-passive { background: var(--muted); color: var(--muted-foreground); border-color: var(--border-strong); }
 .badge-neutral { background: var(--muted); color: var(--muted-foreground); border-color: var(--border); }
 .badge-dept    { background: var(--surface-2); color: var(--muted-foreground); border-color: var(--border); font-weight: 500; }
