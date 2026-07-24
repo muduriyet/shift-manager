@@ -1,5 +1,5 @@
 import type { ReactNode, CSSProperties } from 'react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Button } from './Button';
 
 interface DialogProps {
@@ -12,14 +12,44 @@ interface DialogProps {
   style?: CSSProperties;
 }
 
+// ---- Escape yığını ----
+// Aynı anda birden fazla Dialog açık olabiliyor (ör. TaskModal + arşiv onayı).
+// Her Dialog kendi dinleyicisini eklerse tek Escape hepsini birden kapatır; bu
+// yüzden tek bir document dinleyicisi var ve yalnız yığının en üstündekini çağırır.
+//
+// Yığına onClose'un KENDİSİ değil, ref'i konuyor: çağrı yerlerinin çoğu satır içi
+// arrow geçiyor (onClose={() => setX(false)}), yani her render'da kimlik değişiyor.
+// Fonksiyonu doğrudan koysaydık effect'in bağımlılığı her render'da tetiklenir,
+// dıştaki Dialog pop-push ile yığının tepesine çıkar ve Escape yanlış olanı
+// kapatırdı — düzeltmeye çalıştığımız davranışın aynısı.
+type CloseRef = { current: () => void };
+const closeStack: CloseRef[] = [];
+
+function onDocumentKey(e: KeyboardEvent) {
+  if (e.key !== 'Escape') return;
+  closeStack[closeStack.length - 1]?.current();
+}
+
+function pushClose(ref: CloseRef) {
+  if (closeStack.length === 0) document.addEventListener('keydown', onDocumentKey);
+  closeStack.push(ref);
+}
+
+function popClose(ref: CloseRef) {
+  const i = closeStack.lastIndexOf(ref);
+  if (i > -1) closeStack.splice(i, 1);
+  if (closeStack.length === 0) document.removeEventListener('keydown', onDocumentKey);
+}
+
 export function Dialog({ title, desc, children, footer, onClose, width, style }: DialogProps) {
+  // Ref her render'da tazelenir; yığındaki sıra bundan etkilenmez.
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+
   useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
-    }
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
+    pushClose(closeRef);
+    return () => popClose(closeRef);
+  }, []);
 
   return (
     <div
