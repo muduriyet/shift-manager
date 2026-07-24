@@ -162,6 +162,9 @@ input, select, textarea { font-family: inherit; }
 
 /* ---- stat cards ---- */
 .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+/* 3 kartlık varyant. Inline style yerine sınıf: aşağıdaki responsive medya
+   sorguları (aynı özgüllük, daha sonra) bunu ezebilsin diye burada duruyor. */
+.stat-grid-3 { grid-template-columns: repeat(3, 1fr); }
 .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px 18px; box-shadow: var(--shadow-sm); display:flex; flex-direction: column; gap: 10px; }
 .stat-top { display: flex; align-items: center; justify-content: space-between; }
 .stat-label { font-size: 13px; color: var(--muted-foreground); font-weight: 500; }
