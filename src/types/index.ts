@@ -20,7 +20,7 @@ export type RoleName = string;
 export type ShiftCodeKey = 'S' | 'Ö' | 'G' | 'Öz' | 'İ' | 'Yİ' | 'Üİ' | 'İs' | '-';
 export type ShiftStatus = 'Planlandı' | 'Geldi' | 'Gelmedi';
 export type EmployeeStatus = 'Aktif' | 'Pasif';
-export type ViewId = 'cizelge' | 'personeller' | 'gunluk' | 'raporlar' | 'ayarlar' | 'satis' | 'gorev';
+export type ViewId = 'cizelge' | 'personeller' | 'gunluk' | 'raporlar' | 'ayarlar' | 'satis' | 'gorev' | 'isegiris';
 export type ScheduleMode = 'hafta' | 'ay';
 
 export interface ShiftCodeDef {
@@ -127,6 +127,56 @@ export interface TaskAttachment {
   mimeType: string | null;
   uploadedBy: string | null; // profiles.id
   createdAt: string;
+}
+
+// ---- İşe Giriş Süreçleri (Onboarding) ----
+// stage = ULAŞILAN kilometre taşı: 1 mail atıldı, 2 SGK yapıldı, 3 asıllar geldi.
+// 3 terminaldir — süreç orada tamamlanmış sayılır (bkz. lib/onboarding.ts isComplete).
+export type OnboardingStage = 1 | 2 | 3;
+export type OnboardingDocSet = 'personel' | 'giris' | 'asil';
+
+// Liste satırı: onboarding_list_view'dan gelir. phone/iban/notes BURADA YOK —
+// view onları taşımıyor ki tüm açık süreçlerin IBAN'ı ekran açılışında belleğe inmesin.
+export interface Onboarding {
+  id: number;
+  employeeId: number;
+  stage: OnboardingStage;
+  archivedAt: string | null;
+  createdBy: string | null;    // profiles.id
+  createdAt: string;
+  updatedAt: string;
+  personelDone: number;  personelTotal: number;
+  girisDone: number;     girisTotal: number;
+  asilDone: number;      asilTotal: number;
+}
+
+// Detay modalı için: fetchOnboarding(id) doğrudan tablodan çeker.
+export interface OnboardingDetail extends Onboarding {
+  phone: string;
+  iban: string;
+  notes: string;
+}
+
+// Sürece kopyalanmış evrak satırı — katalogdan bağımsız yaşar.
+export interface OnboardingDoc {
+  id: number;
+  onboardingId: number;
+  docSet: OnboardingDocSet;
+  name: string;
+  description: string;
+  sortOrder: number;
+  isDone: boolean;
+  updatedAt: string;
+}
+
+// Evrak kataloğu (şablon). Süreç açılırken satırları OnboardingDoc'a kopyalanır.
+export interface OnboardingDocDef {
+  id: number;
+  docSet: OnboardingDocSet;
+  name: string;
+  description: string;
+  sortOrder: number;
+  isActive: boolean;
 }
 
 export interface MonthDay {

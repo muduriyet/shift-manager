@@ -6,6 +6,7 @@ import type {
   SalesImportConfig, SalesConfigStatus, SalesMapping, SalesDailyReport,
   SalesImportScope, SalesReportValues, SalesImportApplyResult, SalesDailyView,
   Task, TaskPriority, RepeatKind, RepeatUnit, Profile, TaskComment, TaskActivity, TaskAttachment,
+  Onboarding, OnboardingDetail, OnboardingDoc, OnboardingDocDef, OnboardingDocSet, OnboardingStage,
 } from '../types';
 
 const supabase = () => getSupabaseClient();
@@ -890,5 +891,244 @@ export async function removeAttachment(id: number, path: string): Promise<void> 
   const { error: sErr } = await supabase().storage.from(ATTACH_BUCKET).remove([path]);
   if (sErr) throw sErr;
   const { error } = await supabase().from('task_attachments').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ---- İşe Giriş Süreçleri: personel yardımcıları ----
+// Mevcut updateEmployee 9 alanın hepsini ister; süreç ekranı yalnız birkaçını
+// düzenliyor. setEmployeeActive desenini izleyen dar yazıcılar eklendi;
+// createEmployee/updateEmployee'ye dokunulmadı.
+
+// Yeni personeli App state'ine sokmanın tek yolu: RPC yalnız id döndürüyor,
+// Employee istemcide kurulamıyor (station/dept/role adları embedded join'den geliyor).
+export async function fetchEmployee(id: number): Promise<Employee> {
+  const { data, error } = await supabase().from('employees').select(EMP_SELECT).eq('id', id).single();
+  if (error) throw error;
+  return toEmployee(data as unknown as EmpRow);
+}
+
+export async function updateEmployeeName(id: number, name: string): Promise<Employee> {
+  const { data, error } = await supabase()
+    .from('employees').update({ name }).eq('id', id).select(EMP_SELECT).single();
+  if (error) throw error;
+  return toEmployee(data as unknown as EmpRow);
+}
+
+export async function updateEmployeeAssignment(
+  id: number,
+  form: { stationId: number; deptId: number; roleId: number; startDate: string | null },
+): Promise<Employee> {
+  const { data, error } = await supabase()
+    .from('employees')
+    .update({
+      station_id: form.stationId,
+      dept_id:    form.deptId,
+      role_id:    form.roleId,
+      start_date: form.startDate || null,
+    })
+    .eq('id', id).select(EMP_SELECT).single();
+  if (error) throw error;
+  return toEmployee(data as unknown as EmpRow);
+}
+
+// ---- İşe Giriş Süreçleri (Onboarding) ----
+// Okumalar view'a, yazmalar tablolara gider. View phone/iban/notes taşımaz —
+// liste tüm açık süreçleri çektiği için IBAN oraya konsaydı toplu hâlde belleğe
+// inerdi; detay bunları fetchOnboarding(id) ile ayrıca çeker.
+
+interface OnboardingRow {
+  id: number;
+  employee_id: number;
+  stage: number;
+  archived_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  personel_done: number; personel_total: number;
+  giris_done: number;    giris_total: number;
+  asil_done: number;     asil_total: number;
+}
+
+interface OnboardingDetailRow extends OnboardingRow {
+  phone: string;
+  iban: string;
+  notes: string;
+}
+
+function toOnboarding(r: OnboardingRow): Onboarding {
+  return {
+    id: r.id,
+    employeeId: r.employee_id,
+    stage: r.stage as OnboardingStage,
+    archivedAt: r.archived_at,
+    createdBy: r.created_by,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+    personelDone: r.personel_done, personelTotal: r.personel_total,
+    girisDone: r.giris_done,       girisTotal: r.giris_total,
+    asilDone: r.asil_done,         asilTotal: r.asil_total,
+  };
+}
+
+interface OnboardingDocRow {
+  id: number;
+  onboarding_id: number;
+  doc_set: string;
+  name: string;
+  description: string;
+  sort_order: number;
+  is_done: boolean;
+  updated_at: string;
+}
+
+function toOnboardingDoc(r: OnboardingDocRow): OnboardingDoc {
+  return {
+    id: r.id,
+    onboardingId: r.onboarding_id,
+    docSet: r.doc_set as OnboardingDocSet,
+    name: r.name,
+    description: r.description ?? '',
+    sortOrder: r.sort_order,
+    isDone: r.is_done,
+    updatedAt: r.updated_at,
+  };
+}
+
+interface OnboardingDocDefRow {
+  id: number;
+  doc_set: string;
+  name: string;
+  description: string;
+  sort_order: number;
+  is_active: boolean;
+}
+
+function toDocDef(r: OnboardingDocDefRow): OnboardingDocDef {
+  return {
+    id: r.id,
+    docSet: r.doc_set as OnboardingDocSet,
+    name: r.name,
+    description: r.description ?? '',
+    sortOrder: r.sort_order,
+    isActive: r.is_active,
+  };
+}
+
+export async function fetchOnboardings(): Promise<Onboarding[]> {
+  const { data, error } = await supabase()
+    .from('onboarding_list_view').select('*')
+    .is('archived_at', null)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data as OnboardingRow[]).map(toOnboarding);
+}
+
+// Detay modalı: view'da olmayan phone/iban/notes için doğrudan tabloya gider.
+// Sayaçları view'dan gelen satır zaten taşıyor; burada sıfırla doldurulur.
+export async function fetchOnboarding(id: number): Promise<OnboardingDetail> {
+  const { data, error } = await supabase().from('onboardings').select('*').eq('id', id).single();
+  if (error) throw error;
+  const r = data as OnboardingDetailRow;
+  return {
+    ...toOnboarding({ ...r, personel_done: 0, personel_total: 0, giris_done: 0, giris_total: 0, asil_done: 0, asil_total: 0 }),
+    phone: r.phone ?? '',
+    iban: r.iban ?? '',
+    notes: r.notes ?? '',
+  };
+}
+
+export async function fetchOnboardingDocs(onboardingId: number): Promise<OnboardingDoc[]> {
+  const { data, error } = await supabase()
+    .from('onboarding_docs').select('*')
+    .eq('onboarding_id', onboardingId)
+    .order('doc_set').order('sort_order');
+  if (error) throw error;
+  return (data as OnboardingDocRow[]).map(toOnboardingDoc);
+}
+
+export interface OnboardingCreateForm {
+  name: string;
+  stationId: number;
+  deptId: number;
+  roleId: number;
+  startDate: string | null;
+}
+
+// Personel + süreç tek transaction. employee_id de döner: çağıran taraf onunla
+// fetchEmployee() çağırıp App state'ini güncelliyor, yoksa yeni satır boş render eder.
+export async function createOnboardingWithEmployee(
+  form: OnboardingCreateForm,
+  createdBy: string | null,
+): Promise<{ onboardingId: number; employeeId: number }> {
+  const { data, error } = await supabase().rpc('create_onboarding_with_employee', {
+    p_name:       form.name,
+    p_station_id: form.stationId,
+    p_dept_id:    form.deptId,
+    p_role_id:    form.roleId,
+    p_start_date: form.startDate || null,
+    p_created_by: createdBy,
+  });
+  if (error) throw error;
+  const row = (data as { onboarding_id: number; employee_id: number }[])[0];
+  return { onboardingId: row.onboarding_id, employeeId: row.employee_id };
+}
+
+export async function setOnboardingStage(id: number, stage: OnboardingStage): Promise<void> {
+  const { error } = await supabase().from('onboardings').update({ stage }).eq('id', id);
+  if (error) throw error;
+}
+
+export async function setOnboardingContact(
+  id: number, form: { phone: string; iban: string },
+): Promise<void> {
+  const { error } = await supabase()
+    .from('onboardings').update({ phone: form.phone, iban: form.iban }).eq('id', id);
+  if (error) throw error;
+}
+
+export async function setOnboardingNotes(id: number, notes: string): Promise<void> {
+  const { error } = await supabase().from('onboardings').update({ notes }).eq('id', id);
+  if (error) throw error;
+}
+
+export async function setOnboardingDocDone(docId: number, done: boolean): Promise<void> {
+  const { error } = await supabase().from('onboarding_docs').update({ is_done: done }).eq('id', docId);
+  if (error) throw error;
+}
+
+// Soft delete: tamamlanan (veya iptal edilen) süreç listeden düşer, kayıt kalır.
+export async function archiveOnboarding(id: number): Promise<void> {
+  const { error } = await supabase()
+    .from('onboardings').update({ archived_at: new Date().toISOString() }).eq('id', id);
+  if (error) throw error;
+}
+
+// ---- Evrak kataloğu ----
+
+export async function fetchDocDefs(): Promise<OnboardingDocDef[]> {
+  const { data, error } = await supabase()
+    .from('onboarding_doc_defs').select('*')
+    .eq('is_active', true)
+    .order('doc_set').order('sort_order');
+  if (error) throw error;
+  return (data as OnboardingDocDefRow[]).map(toDocDef);
+}
+
+// RPC: tanımı yazar VE devam eden süreçlere yayar (tek transaction).
+// Daha önce kaldırılmış aynı isimli tanım varsa yeniden aktifleşir.
+export async function addDocDef(
+  docSet: OnboardingDocSet, name: string, description: string,
+): Promise<number> {
+  const { data, error } = await supabase().rpc('add_onboarding_doc_def', {
+    p_doc_set: docSet, p_name: name, p_description: description,
+  });
+  if (error) throw error;
+  return data as number;
+}
+
+// Kaldırma yayılmaz: mevcut süreçlerdeki kopyalar (ve işaretli durumları) korunur,
+// tanım yalnız bundan sonra açılacak süreçlerde görünmez.
+export async function removeDocDef(id: number): Promise<void> {
+  const { error } = await supabase().from('onboarding_doc_defs').update({ is_active: false }).eq('id', id);
   if (error) throw error;
 }

@@ -22,6 +22,7 @@ import { DailyScreen } from './components/daily/DailyScreen';
 import { ReportsScreen } from './components/reports/ReportsScreen';
 import { SettingsScreen } from './components/settings/SettingsScreen';
 import { TaskNotebookScreen } from './components/tasks/TaskNotebookScreen';
+import { OnboardingScreen } from './components/onboarding/OnboardingScreen';
 import { TaskModal } from './components/modals/TaskModal';
 import { ShiftModal } from './components/modals/ShiftModal';
 import { EmployeeModal } from './components/modals/EmployeeModal';
@@ -66,7 +67,7 @@ interface EmployeeFormData {
 
 const DEFAULT_VIEW: ViewId = 'cizelge';
 const DEFAULT_SCHEDULE_MODE: ScheduleMode = 'ay';
-const VIEW_IDS: readonly ViewId[] = ['cizelge', 'personeller', 'gunluk', 'gorev', 'raporlar', 'ayarlar', 'satis'];
+const VIEW_IDS: readonly ViewId[] = ['cizelge', 'personeller', 'gunluk', 'gorev', 'isegiris', 'raporlar', 'ayarlar', 'satis'];
 const SCHEDULE_MODES: readonly ScheduleMode[] = ['hafta', 'ay'];
 
 function isViewId(value: string | null): value is ViewId {
@@ -627,6 +628,23 @@ export default function App() {
           onToggleDone={handleToggleTaskDone}
           onAdd={() => { setTaskToEdit(null); setTaskModalOpen(true); }}
           onEdit={t => { setTaskToEdit(t); setTaskModalOpen(true); }}
+        />
+      );
+      break;
+    case 'isegiris':
+      screen = (
+        <OnboardingScreen
+          employees={employees}
+          stations={stations}
+          departments={departments}
+          roles={roles}
+          currentUserId={userId}
+          // Yeni oluşturulan ve düzenlenen personel App state'ine geri akmalı;
+          // yoksa Personel Listesi ve Çizelge bayat kalır.
+          onEmployeeSaved={e => setEmployees(prev =>
+            prev.some(x => x.id === e.id) ? prev.map(x => x.id === e.id ? e : x) : [...prev, e]
+          )}
+          onToast={toast}
         />
       );
       break;
