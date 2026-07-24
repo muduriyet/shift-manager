@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Employee, Station, Department, Role, Onboarding } from '../../types';
+import type { Employee, Station, Department, Role, Profile, Onboarding } from '../../types';
 import { fetchOnboardings } from '../../lib/db';
-import { activeDocCount, stageDef, trLower } from '../../lib/onboarding';
+import { activeDocCount, fmtDMY, stageDef, trLower } from '../../lib/onboarding';
+import { OnboardingModal } from '../modals/OnboardingModal';
 import { Avatar } from '../ui/Avatar';
 import { Icon } from '../ui/Icon';
 import { Select } from '../ui/Select';
@@ -14,16 +15,10 @@ interface OnboardingScreenProps {
   stations: Station[];
   departments: Department[];
   roles: Role[];
+  profiles: Profile[];
   currentUserId: string | null;
   onEmployeeSaved: (e: Employee) => void;
   onToast: (msg: string) => void;
-}
-
-// Tasarımdaki gg.aa.yyyy. Kolon tabular-nums ile hizalanıyor.
-function fmtDMY(ymd: string | null): string {
-  if (!ymd) return '—';
-  const [y, m, d] = ymd.split('-');
-  return `${d}.${m}.${y}`;
 }
 
 // Aşama çubuğu: k. segment stage >= k iken dolu.
@@ -43,11 +38,12 @@ function StageBar({ stage }: { stage: number }) {
   );
 }
 
-export function OnboardingScreen({ employees, stations, onToast }: OnboardingScreenProps) {
+export function OnboardingScreen({ employees, stations, profiles, onToast }: OnboardingScreenProps) {
   const [list, setList] = useState<Onboarding[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
   const [station, setStation] = useState('Tümü');
+  const [openId, setOpenId] = useState<number | null>(null);
 
   // Ekran-yerel fetch (alive guard) — App'in giriş anındaki Promise.all'ına
   // eklenmedi; oradaki bir hata tüm uygulamayı bloke ediyor.
@@ -66,6 +62,17 @@ export function OnboardingScreen({ employees, stations, onToast }: OnboardingScr
     })();
     return () => { alive = false; };
   }, [onToast]);
+
+  // Modal kapanışında liste bir kez yenilenir (S4'te evrak/aşama yazımı
+  // sayaçları değiştirecek). Arşivleme kontrolü de buraya gelecek.
+  async function reload() {
+    try {
+      setList(await fetchOnboardings());
+    } catch (err) {
+      console.error('Liste yenilenemedi', err);
+      onToast('Liste yenilenemedi');
+    }
+  }
 
   const empById = useMemo(() => new Map(employees.map(e => [e.id, e])), [employees]);
 
@@ -94,6 +101,9 @@ export function OnboardingScreen({ employees, stations, onToast }: OnboardingScr
 
   const stationNames = stations.map(s => s.name);
   const hasAny = list.length > 0;
+
+  // Açık modalın verisi listeden gelir; personel eşleşmesi zaten joined'da yapıldı.
+  const acik = openId != null ? joined.find(x => x.o.id === openId) ?? null : null;
 
   return (
     <div>
@@ -159,7 +169,7 @@ export function OnboardingScreen({ employees, stations, onToast }: OnboardingScr
                       <tr
                         key={o.id}
                         style={{ cursor: 'pointer' }}
-                        onClick={() => console.log('süreç detayı (S3)', o.id)}
+                        onClick={() => setOpenId(o.id)}
                       >
                         <td>
                           <div className="cell-name">
@@ -211,6 +221,15 @@ export function OnboardingScreen({ employees, stations, onToast }: OnboardingScr
           </>
         )}
       </div>
+
+      {acik && (
+        <OnboardingModal
+          process={acik.o}
+          employee={acik.emp}
+          profiles={profiles}
+          onClose={() => { setOpenId(null); void reload(); }}
+        />
+      )}
     </div>
   );
 }

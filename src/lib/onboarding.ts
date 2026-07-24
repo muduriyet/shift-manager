@@ -100,6 +100,14 @@ export const STEP_BADGE: Record<StepStatus, { label: string; status: string; dot
   bekleme: { label: 'Beklemede',    status: 'Planlandı',  dot: false },
 };
 
+// ---- Tarih ----
+// Tasarımdaki gg.aa.yyyy. slice(0,10) hem 'YYYY-MM-DD' hem ISO timestamp'i karşılar.
+export function fmtDMY(value: string | null): string {
+  if (!value) return '—';
+  const [y, m, d] = value.slice(0, 10).split('-');
+  return `${d}.${m}.${y}`;
+}
+
 // ---- Arama ----
 // Türkçe küçültme iki tarafa da uygulanmalı: İ→i̇, I→ı. Aksi halde "İş" ile
 // "iş" eşleşmez ve evrak/personel adları İ/Ö/Ğ dolu.

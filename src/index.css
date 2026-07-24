@@ -574,6 +574,9 @@ table.month { border-collapse: separate; border-spacing: 0; min-width: 100%; use
 .dialog-head p { margin: 5px 0 0; font-size: 13.5px; color: var(--muted-foreground); }
 .dialog-body { padding: 20px 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .dialog-body .col-2 { grid-column: 1 / -1; }
+/* Ana içerik + sağ ray. Inline style yerine sınıf: aşağıdaki 900px medya
+   sorgusu (aynı özgüllük, daha sonra) bunu tek kolona indirebilsin diye. */
+.dialog-body-rail { grid-template-columns: 1fr 320px; align-items: start; }
 .dialog-foot { padding: 16px 24px 22px; display:flex; align-items:center; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border); margin-top: 4px; }
 .dialog-close { position: absolute; top: 18px; right: 18px; }
 .dialog-wrap { position: relative; }

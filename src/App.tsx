@@ -638,6 +638,7 @@ export default function App() {
           stations={stations}
           departments={departments}
           roles={roles}
+          profiles={profiles}
           currentUserId={userId}
           // Yeni oluşturulan ve düzenlenen personel App state'ine geri akmalı;
           // yoksa Personel Listesi ve Çizelge bayat kalır.
