@@ -1,32 +1,53 @@
 import { useEffect, useState } from 'react';
-import type { Employee, Profile, Onboarding, OnboardingDetail, OnboardingDoc, OnboardingStage } from '../../types';
-import { fetchOnboarding, fetchOnboardingDocs } from '../../lib/db';
+import type {
+  Employee, Profile, Station, Department, Role,
+  Onboarding, OnboardingDoc, OnboardingStage,
+} from '../../types';
 import {
-  DOC_SETS, STAGES, STEP_BADGE, allOriginalsReceived, fmtDMY, isComplete, stepStatus,
-} from '../../lib/onboarding';
+  fetchOnboarding, fetchOnboardingDocs, setOnboardingContact, setOnboardingDocDone,
+  setOnboardingNotes, setOnboardingStage, updateEmployeeAssignment, updateEmployeeName,
+} from '../../lib/db';
+import { DOC_SETS, STAGES, STEP_BADGE, fmtDMY, isComplete, stepStatus } from '../../lib/onboarding';
 import { Dialog } from '../ui/Dialog';
 import { Badge } from '../ui/Badge';
 import { Avatar } from '../ui/Avatar';
 import { Icon } from '../ui/Icon';
+import { Button } from '../ui/Button';
+import { Select } from '../ui/Select';
+import { Field, Input, Textarea } from '../ui/Field';
 
 interface OnboardingModalProps {
   process: Onboarding;      // liste satırı — phone/iban/notes taşımaz
   employee: Employee;
   profiles: Profile[];
-  onClose: () => void;
+  stations: Station[];
+  departments: Department[];
+  roles: Role[];
+  onEmployeeSaved: (e: Employee) => void;
+  onToast: (msg: string) => void;
+  // Son aşamayı geri bildirir: arşivleme kararı EKRANDA veriliyor ki
+  // X / Escape / backdrop üç kapanış yolu da aynı kontrolden geçsin.
+  onClose: (finalStage: OnboardingStage) => void;
 }
 
 // ---- Stepper ----
-// Üç durum: tamam / devam / bekleme (lib/onboarding.ts stepStatus).
-// Tasarımın iki rozeti üçe çıktı; "Devam Ediyor" sıradaki işi gösteriyor.
-function Stepper({ process }: { process: Onboarding }) {
+function Stepper({
+  stage, tamam, onPick,
+}: {
+  stage: OnboardingStage;
+  tamam: boolean;
+  onPick: (k: OnboardingStage) => void;
+}) {
+  const sahte = { stage } as Onboarding;
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 0 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr' }}>
       {STAGES.map(s => {
-        const durum = stepStatus(process, s.n);
+        const durum = tamam ? 'tamam' : stepStatus(sahte, s.n);
         const rozet = STEP_BADGE[durum];
-        const sonraki = s.n < 3 ? stepStatus(process, (s.n + 1) as OnboardingStage) : null;
-        const daireStil =
+        const sonraki = s.n < 3
+          ? (tamam ? 'tamam' : stepStatus(sahte, (s.n + 1) as OnboardingStage))
+          : null;
+        const daire =
           durum === 'tamam'
             ? { background: 'var(--came-fg)', color: '#fff', border: '2px solid var(--came-fg)', boxShadow: '0 0 0 5px var(--came-bg)' }
             : durum === 'devam'
@@ -35,7 +56,6 @@ function Stepper({ process }: { process: Onboarding }) {
 
         return (
           <div key={s.n} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, position: 'relative' }}>
-            {/* Bağlayıcı çizgi: sonraki adım tamamsa düz yeşil, değilse kesikli gri */}
             {sonraki && (
               <div
                 style={{
@@ -44,14 +64,17 @@ function Stepper({ process }: { process: Onboarding }) {
                 }}
               />
             )}
-            <div
+            <button
+              type="button"
+              onClick={() => onPick(s.n)}
+              title={`${s.n}. adıma al`}
               style={{
                 width: 52, height: 52, borderRadius: '50%', display: 'grid', placeItems: 'center',
-                position: 'relative', zIndex: 1, ...daireStil,
+                position: 'relative', zIndex: 1, cursor: 'pointer', padding: 0, ...daire,
               }}
             >
               <Icon name={s.icon} size={22} />
-            </div>
+            </button>
             <div style={{ fontSize: 12.5, fontWeight: 600, textAlign: 'center', lineHeight: 1.35, padding: '0 6px' }}>
               {s.n}. {s.title}
             </div>
@@ -63,40 +86,46 @@ function Stepper({ process }: { process: Onboarding }) {
   );
 }
 
-// ---- Evrak tablosu (S3: salt okunur) ----
-// Pill'ler S4'te tıklanabilir olacak; şimdilik yalnız durumu gösteriyorlar.
+// ---- Evrak tablosu ----
 function DocTable({
-  setId, docs, tamamlandiSatiri,
+  setId, docs, onToggle, tamamlandiSatiri,
 }: {
   setId: 'personel' | 'giris' | 'asil';
   docs: OnboardingDoc[];
+  onToggle: (doc: OnboardingDoc, done: boolean) => void;
   tamamlandiSatiri?: boolean;
 }) {
   const def = DOC_SETS.find(s => s.id === setId)!;
   const satirlar = docs.filter(d => d.docSet === setId);
   const grid = 'minmax(0,1fr) 120px 120px';
 
-  const pill = (aktif: boolean, olumlu: boolean, metin: string) => (
-    <span
-      style={{
-        display: 'inline-flex', alignItems: 'center', gap: 6,
-        padding: '4px 10px', borderRadius: 99, fontSize: 12,
-        fontWeight: aktif ? 650 : 500,
-        background: aktif ? (olumlu ? 'var(--came-bg)' : 'var(--absent-bg)') : 'var(--surface)',
-        border: `1px solid ${aktif ? (olumlu ? 'var(--came-bd)' : 'var(--absent-bd)') : 'var(--border)'}`,
-        color: aktif ? (olumlu ? 'var(--came-fg)' : 'var(--absent-fg)') : 'var(--muted-foreground)',
-      }}
-    >
-      <span
+  const pill = (d: OnboardingDoc, olumlu: boolean) => {
+    const aktif = olumlu ? d.isDone : !d.isDone;
+    const metin = olumlu ? def.doneLabel : def.notDoneLabel;
+    return (
+      <button
+        type="button"
+        onClick={() => onToggle(d, olumlu)}
         style={{
-          width: 6, height: 6, borderRadius: '50%',
-          background: aktif ? (olumlu ? 'var(--came-dot)' : 'var(--absent-dot)') : 'transparent',
-          border: aktif ? 'none' : '1.5px solid var(--subtle-foreground)',
+          display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer',
+          padding: '4px 10px', borderRadius: 99, fontSize: 12,
+          fontWeight: aktif ? 650 : 500,
+          background: aktif ? (olumlu ? 'var(--came-bg)' : 'var(--absent-bg)') : 'var(--surface)',
+          border: `1px solid ${aktif ? (olumlu ? 'var(--came-bd)' : 'var(--absent-bd)') : 'var(--border)'}`,
+          color: aktif ? (olumlu ? 'var(--came-fg)' : 'var(--absent-fg)') : 'var(--muted-foreground)',
         }}
-      />
-      {metin}
-    </span>
-  );
+      >
+        <span
+          style={{
+            width: 6, height: 6, borderRadius: '50%',
+            background: aktif ? (olumlu ? 'var(--came-dot)' : 'var(--absent-dot)') : 'transparent',
+            border: aktif ? 'none' : '1.5px solid var(--subtle-foreground)',
+          }}
+        />
+        {metin}
+      </button>
+    );
+  };
 
   return (
     <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
@@ -131,8 +160,8 @@ function DocTable({
               <div style={{ fontSize: 11.5, color: 'var(--subtle-foreground)' }}>{d.description}</div>
             )}
           </div>
-          <div style={{ textAlign: 'center' }}>{pill(d.isDone, true, def.doneLabel)}</div>
-          <div style={{ textAlign: 'center' }}>{pill(!d.isDone, false, def.notDoneLabel)}</div>
+          <div style={{ textAlign: 'center' }}>{pill(d, true)}</div>
+          <div style={{ textAlign: 'center' }}>{pill(d, false)}</div>
         </div>
       ))}
 
@@ -153,12 +182,15 @@ function DocTable({
   );
 }
 
-// ---- Sağ ray bölümü ----
-function RailCard({ title, children }: { title: string; children: React.ReactNode }) {
+// ---- Sağ ray ----
+function RailCard({ title, onEdit, editTitle, children }: {
+  title: string; onEdit?: () => void; editTitle?: string; children: React.ReactNode;
+}) {
   return (
     <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-      <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+      <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h3 style={{ margin: 0, fontSize: 13.5, fontWeight: 700 }}>{title}</h3>
+        {onEdit && <Button variant="ghost" size="sm" icon="pencil" onClick={onEdit} title={editTitle} />}
       </div>
       <div style={{ padding: '12px 16px' }}>{children}</div>
     </div>
@@ -174,13 +206,21 @@ function RailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function OnboardingModal({ process, employee, profiles, onClose }: OnboardingModalProps) {
-  const [detail, setDetail] = useState<OnboardingDetail | null>(null);
+export function OnboardingModal({
+  process, employee, profiles, stations, departments, roles,
+  onEmployeeSaved, onToast, onClose,
+}: OnboardingModalProps) {
+  const [stage, setStage] = useState<OnboardingStage>(process.stage);
   const [docs, setDocs] = useState<OnboardingDoc[]>([]);
+  const [phone, setPhone] = useState('');
+  const [iban, setIban] = useState('');
+  const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(true);
 
-  // Liste satırı phone/iban/notes taşımıyor (view onları dışarıda bırakıyor),
-  // evraklar da ayrı tabloda — ikisi paralel çekiliyor.
+  const [notEdit, setNotEdit] = useState(false);
+  const [notDraft, setNotDraft] = useState('');
+  const [duzenleme, setDuzenleme] = useState<'personel' | 'gorev' | null>(null);
+
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -189,123 +229,373 @@ export function OnboardingModal({ process, employee, profiles, onClose }: Onboar
           fetchOnboarding(process.id),
           fetchOnboardingDocs(process.id),
         ]);
-        if (alive) { setDetail(d); setDocs(ds); }
+        if (alive) { setPhone(d.phone); setIban(d.iban); setNotes(d.notes); setDocs(ds); }
       } catch (err) {
         console.error('Süreç detayı yüklenemedi', err);
+        onToast('Süreç detayı yüklenemedi');
       } finally {
         if (alive) setLoading(false);
       }
     })();
     return () => { alive = false; };
-  }, [process.id]);
+  }, [process.id, onToast]);
 
-  const tamam = isComplete(process);
-  const hepsiGeldi = allOriginalsReceived(process);
+  const tamam = isComplete({ stage } as Onboarding);
+  const asillar = docs.filter(d => d.docSet === 'asil');
+  // Lokal docs'tan anlık türetiliyor; view sayaçları modal açıkken bayat kalır.
+  const hepsiGeldi = asillar.length > 0 && asillar.every(d => d.isDone);
   const olusturan = profiles.find(p => p.id === process.createdBy)?.displayName ?? null;
+
+  // İyimser: UI hemen döner, hata olursa geri alınır.
+  async function toggleDoc(doc: OnboardingDoc, done: boolean) {
+    if (doc.isDone === done) return;
+    setDocs(prev => prev.map(d => d.id === doc.id ? { ...d, isDone: done } : d));
+    try {
+      await setOnboardingDocDone(doc.id, done);
+    } catch (err) {
+      console.error('Evrak güncellenemedi', err);
+      setDocs(prev => prev.map(d => d.id === doc.id ? { ...d, isDone: !done } : d));
+      onToast('Evrak güncellenemedi');
+    }
+  }
+
+  // İleri ve geri serbest. Aşamayı geri almak evrak işaretlerini SİLMEZ —
+  // yanlış aşama seçimi veri kaybettirmemeli.
+  async function pickStage(k: OnboardingStage) {
+    if (k === stage) return;
+    const onceki = stage;
+    setStage(k);
+    try {
+      await setOnboardingStage(process.id, k);
+    } catch (err) {
+      console.error('Aşama güncellenemedi', err);
+      setStage(onceki);
+      onToast('Aşama güncellenemedi');
+    }
+  }
+
+  async function saveNotes() {
+    const yeni = notDraft.trim();
+    try {
+      await setOnboardingNotes(process.id, yeni);
+      setNotes(yeni);
+      setNotEdit(false);
+    } catch (err) {
+      console.error('Not kaydedilemedi', err);
+      onToast('Not kaydedilemedi');
+    }
+  }
+
+  return (
+    <>
+      <Dialog
+        title={employee.name}
+        desc={`${employee.role} • ${employee.station} Şubesi • ${employee.dept}`}
+        width={980}
+        onClose={() => onClose(stage)}
+      >
+        <div className="dialog-body dialog-body-rail">
+          {/* ---- Ana kolon ---- */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0 }}>
+            <div>
+              {tamam
+                ? <Badge status="Geldi">Tamamlandı</Badge>
+                : <Badge status="Aktif" dot>Aktif Süreç</Badge>}
+            </div>
+
+            <div
+              style={{
+                display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14,
+                background: 'var(--surface-2)', border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-lg)', padding: '14px 18px',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 11.5, color: 'var(--muted-foreground)' }}>İşe Giriş Tarihi</div>
+                <div className="tnum" style={{ fontSize: 13.5, fontWeight: 600 }}>{fmtDMY(employee.startDate)}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11.5, color: 'var(--muted-foreground)' }}>Oluşturulma Tarihi</div>
+                <div className="tnum" style={{ fontSize: 13.5, fontWeight: 600 }}>{fmtDMY(process.createdAt)}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11.5, color: 'var(--muted-foreground)' }}>Oluşturan</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 2 }}>
+                  {olusturan
+                    ? <><Avatar name={olusturan} size={22} /><span style={{ fontSize: 13, fontWeight: 500 }}>{olusturan}</span></>
+                    : <span style={{ fontSize: 13.5, fontWeight: 600 }}>—</span>}
+                </div>
+              </div>
+            </div>
+
+            <Stepper stage={stage} tamam={tamam} onPick={pickStage} />
+
+            {loading ? (
+              <div style={{ padding: 30, textAlign: 'center', color: 'var(--muted-foreground)', fontSize: 13.5 }}>
+                Evraklar yükleniyor…
+              </div>
+            ) : (
+              <>
+                <DocTable setId="personel" docs={docs} onToggle={toggleDoc} />
+                <DocTable setId="giris" docs={docs} onToggle={toggleDoc} />
+                <DocTable setId="asil" docs={docs} onToggle={toggleDoc} tamamlandiSatiri={hepsiGeldi} />
+              </>
+            )}
+          </div>
+
+          {/* ---- Sağ ray ---- */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }}>
+            <RailCard title="Personel Bilgileri" editTitle="Düzenle" onEdit={() => setDuzenleme('personel')}>
+              <RailRow label="Ad Soyad" value={employee.name} />
+              <RailRow label="Telefon" value={loading ? '…' : phone} />
+              <RailRow label="IBAN" value={loading ? '…' : iban} />
+            </RailCard>
+
+            <RailCard title="Görev Bilgileri" editTitle="Düzenle" onEdit={() => setDuzenleme('gorev')}>
+              <RailRow label="Departman" value={employee.dept} />
+              <RailRow label="Pozisyon" value={employee.role} />
+              <RailRow label="Şube" value={employee.station} />
+              <RailRow label="İşe Giriş Tarihi" value={fmtDMY(employee.startDate)} />
+            </RailCard>
+
+            <RailCard
+              title="Notlar"
+              editTitle="Not ekle / düzenle"
+              onEdit={notEdit ? undefined : () => { setNotDraft(notes); setNotEdit(true); }}
+            >
+              {notEdit ? (
+                <>
+                  <Textarea
+                    rows={3}
+                    value={notDraft}
+                    placeholder="Not yazın..."
+                    onChange={e => setNotDraft(e.target.value)}
+                  />
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+                    <Button variant="ghost" size="sm" onClick={() => setNotEdit(false)}>İptal</Button>
+                    <Button size="sm" icon="check" onClick={saveNotes}>Kaydet</Button>
+                  </div>
+                </>
+              ) : loading ? (
+                <p style={{ margin: 0, fontSize: 12.5, color: 'var(--muted-foreground)' }}>…</p>
+              ) : notes ? (
+                <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{notes}</p>
+              ) : (
+                <p style={{ margin: 0, fontSize: 12.5, color: 'var(--subtle-foreground)' }}>Henüz not eklenmemiş.</p>
+              )}
+            </RailCard>
+
+            {tamam ? (
+              <div style={{ background: 'var(--came-bg)', border: '1px solid var(--came-bd)', borderRadius: 'var(--radius-lg)', padding: '12px 14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, color: 'var(--came-fg)', fontWeight: 700, fontSize: 13 }}>
+                  <Icon name="check" size={16} />Süreç Tamamlandı
+                </div>
+                <p style={{ margin: '5px 0 0', fontSize: 12.5, lineHeight: 1.5, color: 'var(--came-fg)' }}>
+                  Tüm adımlar tamamlandı, evrak asılları muhasebeye teslim edildi.
+                </p>
+              </div>
+            ) : (
+              <div style={{ background: 'var(--plan-bg)', border: '1px solid var(--plan-bd)', borderRadius: 'var(--radius-lg)', padding: '12px 14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, color: 'var(--plan-fg)', fontWeight: 700, fontSize: 13 }}>
+                  <Icon name="alertCircle" size={16} />Bilgilendirme
+                </div>
+                <p style={{ margin: '5px 0 0', fontSize: 12.5, lineHeight: 1.5, color: 'var(--plan-fg)' }}>
+                  Evrak asılları muhasebeye ulaştığında 3. adımı işaretleyin; süreç o zaman tamamlanır.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </Dialog>
+
+      {duzenleme === 'personel' && (
+        <PersonelDuzenle
+          employee={employee}
+          phone={phone}
+          iban={iban}
+          onCancel={() => setDuzenleme(null)}
+          onSave={async (form) => {
+            try {
+              // Ad employees'e, telefon/IBAN onboardings'e — kullanıcı için tek form.
+              if (form.name !== employee.name) {
+                onEmployeeSaved(await updateEmployeeName(employee.id, form.name));
+              }
+              await setOnboardingContact(process.id, { phone: form.phone, iban: form.iban });
+              setPhone(form.phone); setIban(form.iban);
+              setDuzenleme(null);
+            } catch (err) {
+              console.error('Personel bilgileri kaydedilemedi', err);
+              onToast('Personel bilgileri kaydedilemedi');
+            }
+          }}
+        />
+      )}
+
+      {duzenleme === 'gorev' && (
+        <GorevDuzenle
+          employee={employee}
+          stations={stations}
+          departments={departments}
+          roles={roles}
+          onCancel={() => setDuzenleme(null)}
+          onSave={async (form) => {
+            // Employee tipi id taşımıyor (toEmployee onları düşürüyor) →
+            // Select'lerden gelen adları id'ye çevirmek gerekiyor.
+            const stationId = stations.find(s => s.name === form.station)?.id;
+            const deptId    = departments.find(d => d.name === form.dept)?.id;
+            const roleId    = roles.find(r => r.name === form.role)?.id;
+            if (stationId == null || deptId == null || roleId == null) {
+              onToast('Geçersiz şube, departman veya pozisyon');
+              return;
+            }
+            try {
+              onEmployeeSaved(await updateEmployeeAssignment(employee.id, {
+                stationId, deptId, roleId, startDate: form.startDate,
+              }));
+              setDuzenleme(null);
+            } catch (err) {
+              console.error('Görev bilgileri kaydedilemedi', err);
+              onToast('Görev bilgileri kaydedilemedi');
+            }
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+// ---- İç içe düzenleme dialogları ----
+// Dialog yığını (2ec21e4) sayesinde Escape yalnız üsttekini kapatıyor.
+
+function PersonelDuzenle({
+  employee, phone, iban, onCancel, onSave,
+}: {
+  employee: Employee; phone: string; iban: string;
+  onCancel: () => void;
+  onSave: (f: { name: string; phone: string; iban: string }) => void | Promise<void>;
+}) {
+  const [form, setForm] = useState({ name: employee.name, phone, iban });
+  const [hata, setHata] = useState<string | undefined>();
+  const [kaydediliyor, setKaydediliyor] = useState(false);
+
+  async function submit() {
+    const ad = form.name.trim();
+    if (!ad || ad.length < 3 || !ad.includes(' ')) {
+      setHata('Lütfen ad ve soyadı birlikte girin (ör. Ahmet Yılmaz)');
+      return;
+    }
+    setKaydediliyor(true);
+    await onSave({ ...form, name: ad });
+    setKaydediliyor(false);
+  }
 
   return (
     <Dialog
-      title={employee.name}
-      desc={`${employee.role} • ${employee.station} Şubesi • ${employee.dept}`}
-      width={980}
-      onClose={onClose}
+      title="Personel Bilgilerini Düzenle"
+      width={440}
+      onClose={onCancel}
+      footer={
+        <>
+          <Button variant="outline" onClick={onCancel} disabled={kaydediliyor}>İptal</Button>
+          <Button icon="check" onClick={submit} disabled={kaydediliyor}>Kaydet</Button>
+        </>
+      }
     >
-      <div className="dialog-body dialog-body-rail">
-        {/* ---- Ana kolon ---- */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {tamam
-              ? <Badge status="Geldi">Tamamlandı</Badge>
-              : <Badge status="Aktif" dot>Aktif Süreç</Badge>}
-          </div>
-
-          {/* Meta şerit */}
-          <div
-            style={{
-              display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14,
-              background: 'var(--surface-2)', border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-lg)', padding: '14px 18px',
-            }}
-          >
-            <div>
-              <div style={{ fontSize: 11.5, color: 'var(--muted-foreground)' }}>İşe Giriş Tarihi</div>
-              <div style={{ fontSize: 13.5, fontWeight: 600 }} className="tnum">{fmtDMY(employee.startDate)}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 11.5, color: 'var(--muted-foreground)' }}>Oluşturulma Tarihi</div>
-              <div style={{ fontSize: 13.5, fontWeight: 600 }} className="tnum">{fmtDMY(process.createdAt)}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 11.5, color: 'var(--muted-foreground)' }}>Oluşturan</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 2 }}>
-                {olusturan
-                  ? <><Avatar name={olusturan} size={22} /><span style={{ fontSize: 13, fontWeight: 500 }}>{olusturan}</span></>
-                  : <span style={{ fontSize: 13.5, fontWeight: 600 }}>—</span>}
-              </div>
-            </div>
-          </div>
-
-          <Stepper process={process} />
-
-          {loading ? (
-            <div style={{ padding: 30, textAlign: 'center', color: 'var(--muted-foreground)', fontSize: 13.5 }}>
-              Evraklar yükleniyor…
-            </div>
-          ) : (
-            <>
-              <DocTable setId="personel" docs={docs} />
-              <DocTable setId="giris" docs={docs} />
-              <DocTable setId="asil" docs={docs} tamamlandiSatiri={hepsiGeldi} />
-            </>
-          )}
+      <div className="dialog-body">
+        <div className="col-2">
+          <Field label="Ad Soyad" error={hata}>
+            <Input
+              value={form.name}
+              error={!!hata}
+              onChange={e => { setForm(f => ({ ...f, name: e.target.value })); setHata(undefined); }}
+            />
+          </Field>
         </div>
+        <div className="col-2">
+          <Field label="Telefon">
+            <Input value={form.phone} placeholder="0500 000 00 00" onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
+          </Field>
+        </div>
+        <div className="col-2">
+          <Field label="IBAN">
+            <Input value={form.iban} placeholder="TR00 0000 0000 0000 0000 0000 00" onChange={e => setForm(f => ({ ...f, iban: e.target.value }))} />
+          </Field>
+        </div>
+      </div>
+    </Dialog>
+  );
+}
 
-        {/* ---- Sağ ray ---- */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }}>
-          <RailCard title="Personel Bilgileri">
-            <RailRow label="Ad Soyad" value={employee.name} />
-            <RailRow label="Telefon" value={loading ? '…' : (detail?.phone ?? '')} />
-            <RailRow label="IBAN" value={loading ? '…' : (detail?.iban ?? '')} />
-          </RailCard>
+function GorevDuzenle({
+  employee, stations, departments, roles, onCancel, onSave,
+}: {
+  employee: Employee;
+  stations: Station[]; departments: Department[]; roles: Role[];
+  onCancel: () => void;
+  onSave: (f: { station: string; dept: string; role: string; startDate: string | null }) => void | Promise<void>;
+}) {
+  const [form, setForm] = useState({
+    station: employee.station,
+    dept: employee.dept,
+    role: employee.role,
+    startDate: employee.startDate,
+  });
+  const [kaydediliyor, setKaydediliyor] = useState(false);
 
-          <RailCard title="Görev Bilgileri">
-            <RailRow label="Departman" value={employee.dept} />
-            <RailRow label="Pozisyon" value={employee.role} />
-            <RailRow label="Şube" value={employee.station} />
-            <RailRow label="İşe Giriş Tarihi" value={fmtDMY(employee.startDate)} />
-          </RailCard>
+  async function submit() {
+    setKaydediliyor(true);
+    await onSave(form);
+    setKaydediliyor(false);
+  }
 
-          <RailCard title="Notlar">
-            {loading ? (
-              <p style={{ margin: 0, fontSize: 12.5, color: 'var(--muted-foreground)' }}>…</p>
-            ) : detail?.notes ? (
-              <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{detail.notes}</p>
-            ) : (
-              <p style={{ margin: 0, fontSize: 12.5, color: 'var(--subtle-foreground)' }}>Henüz not eklenmemiş.</p>
-            )}
-          </RailCard>
-
-          {/* Bilgi kutusu — metin tasarımdan düzeltildi: bu uygulamada
-              "personel kaydı aktif hale gelme" veya bordro sistemi yok. */}
-          {tamam ? (
-            <div style={{ background: 'var(--came-bg)', border: '1px solid var(--came-bd)', borderRadius: 'var(--radius-lg)', padding: '12px 14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 7, color: 'var(--came-fg)', fontWeight: 700, fontSize: 13 }}>
-                <Icon name="check" size={16} />Süreç Tamamlandı
-              </div>
-              <p style={{ margin: '5px 0 0', fontSize: 12.5, lineHeight: 1.5, color: 'var(--came-fg)' }}>
-                Tüm adımlar tamamlandı, evrak asılları muhasebeye teslim edildi.
-              </p>
-            </div>
-          ) : (
-            <div style={{ background: 'var(--plan-bg)', border: '1px solid var(--plan-bd)', borderRadius: 'var(--radius-lg)', padding: '12px 14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 7, color: 'var(--plan-fg)', fontWeight: 700, fontSize: 13 }}>
-                <Icon name="alertCircle" size={16} />Bilgilendirme
-              </div>
-              <p style={{ margin: '5px 0 0', fontSize: 12.5, lineHeight: 1.5, color: 'var(--plan-fg)' }}>
-                Evrak asılları muhasebeye ulaştığında 3. adımı işaretleyin; süreç o zaman tamamlanır.
-              </p>
-            </div>
-          )}
+  return (
+    <Dialog
+      title="Görev Bilgilerini Düzenle"
+      width={440}
+      onClose={onCancel}
+      footer={
+        <>
+          <Button variant="outline" onClick={onCancel} disabled={kaydediliyor}>İptal</Button>
+          <Button icon="check" onClick={submit} disabled={kaydediliyor}>Kaydet</Button>
+        </>
+      }
+    >
+      <div className="dialog-body">
+        <div className="col-2">
+          <Field label="Şube">
+            <Select
+              value={form.station}
+              onChange={v => setForm(f => ({ ...f, station: String(v) }))}
+              options={stations.map(s => s.name)}
+            />
+          </Field>
+        </div>
+        <div className="col-2">
+          <Field label="Departman">
+            <Select
+              value={form.dept}
+              onChange={v => setForm(f => ({ ...f, dept: String(v) }))}
+              options={departments.map(d => d.name)}
+            />
+          </Field>
+        </div>
+        <div className="col-2">
+          <Field label="Pozisyon">
+            <Select
+              value={form.role}
+              onChange={v => setForm(f => ({ ...f, role: String(v) }))}
+              options={roles.map(r => r.name)}
+            />
+          </Field>
+        </div>
+        <div className="col-2">
+          <Field label="İşe Giriş Tarihi">
+            <Input
+              type="date"
+              value={form.startDate ?? ''}
+              onChange={e => setForm(f => ({ ...f, startDate: e.target.value || null }))}
+            />
+          </Field>
         </div>
       </div>
     </Dialog>

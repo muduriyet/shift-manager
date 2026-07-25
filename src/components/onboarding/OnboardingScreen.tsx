@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Employee, Station, Department, Role, Profile, Onboarding } from '../../types';
-import { fetchOnboardings } from '../../lib/db';
+import { archiveOnboarding, fetchOnboardings } from '../../lib/db';
 import { activeDocCount, fmtDMY, stageDef, trLower } from '../../lib/onboarding';
 import { OnboardingModal } from '../modals/OnboardingModal';
 import { Avatar } from '../ui/Avatar';
@@ -38,7 +38,9 @@ function StageBar({ stage }: { stage: number }) {
   );
 }
 
-export function OnboardingScreen({ employees, stations, profiles, onToast }: OnboardingScreenProps) {
+export function OnboardingScreen({
+  employees, stations, departments, roles, profiles, onEmployeeSaved, onToast,
+}: OnboardingScreenProps) {
   const [list, setList] = useState<Onboarding[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
@@ -63,8 +65,6 @@ export function OnboardingScreen({ employees, stations, profiles, onToast }: Onb
     return () => { alive = false; };
   }, [onToast]);
 
-  // Modal kapanışında liste bir kez yenilenir (S4'te evrak/aşama yazımı
-  // sayaçları değiştirecek). Arşivleme kontrolü de buraya gelecek.
   async function reload() {
     try {
       setList(await fetchOnboardings());
@@ -72,6 +72,28 @@ export function OnboardingScreen({ employees, stations, profiles, onToast }: Onb
       console.error('Liste yenilenemedi', err);
       onToast('Liste yenilenemedi');
     }
+  }
+
+  // Arşivleme kararı BURADA, modalın içinde değil: Dialog X butonu, Escape ve
+  // backdrop tıklamasıyla kapanıyor ve üçü de aynı onClose'a gidiyor. Modalın
+  // içindeki bir buton akışına koysaydık Escape ile kapatan kullanıcının
+  // tamamlanmış süreci arşivlenmeden listede kalırdı.
+  //
+  // Anında değil kapanışta: kullanıcı modal içindeyken aşamayı serbestçe
+  // ileri-geri alabilmeli. Anında arşivlense yanlış bir tık süreci listeden
+  // düşürür ve UI'dan geri dönüş kalmazdı.
+  async function handleModalClose(finalStage: number) {
+    const id = openId;
+    setOpenId(null);
+    if (id != null && finalStage >= 3) {
+      try {
+        await archiveOnboarding(id);
+      } catch (err) {
+        console.error('Süreç arşivlenemedi', err);
+        onToast('Süreç arşivlenemedi');
+      }
+    }
+    void reload();
   }
 
   const empById = useMemo(() => new Map(employees.map(e => [e.id, e])), [employees]);
@@ -227,7 +249,12 @@ export function OnboardingScreen({ employees, stations, profiles, onToast }: Onb
           process={acik.o}
           employee={acik.emp}
           profiles={profiles}
-          onClose={() => { setOpenId(null); void reload(); }}
+          stations={stations}
+          departments={departments}
+          roles={roles}
+          onEmployeeSaved={onEmployeeSaved}
+          onToast={onToast}
+          onClose={handleModalClose}
         />
       )}
     </div>
