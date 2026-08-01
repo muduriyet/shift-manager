@@ -4,7 +4,7 @@ import {
   downloadScheduleExport,
   type ScheduleExportScope,
 } from '../../lib/scheduleExport';
-import { MONTH_NAMES } from '../../constants';
+import { MONTH_NAMES, isEmployedInRange, monthBounds } from '../../constants';
 import { Dialog } from '../ui/Dialog';
 import { Button } from '../ui/Button';
 import { Field, Input } from '../ui/Field';
@@ -71,14 +71,17 @@ export function ScheduleExportModal({
     ),
     [employees, deptNames, scope.station],
   );
-  const scopedEmployees = useMemo(
-    () => employees.filter(e =>
+  // Sayaç, dosyaya gerçekten yazılacak personeli göstermeli: çizelgedeki gibi
+  // aralığı seçili ayla kesişmeyenler hariç tutulur.
+  const scopedEmployees = useMemo(() => {
+    const bounds = scope.yearMonth ? monthBounds(scope.yearMonth) : null;
+    return employees.filter(e =>
       e.status === 'Aktif' &&
       e.station === scope.station &&
-      e.dept === scope.dept,
-    ),
-    [employees, scope.station, scope.dept],
-  );
+      e.dept === scope.dept &&
+      (!bounds || isEmployedInRange(e.startDate, e.endDate, bounds.start, bounds.end)),
+    );
+  }, [employees, scope.station, scope.dept, scope.yearMonth]);
   // Seçilen ay bellekte değilken dışa aktarım boş/eksik bir çizelge üretirdi.
   const monthReady = !!scope.yearMonth && isMonthLoaded(scope.yearMonth);
   useEffect(() => {

@@ -1,5 +1,5 @@
 import type { Employee, Shift, ShiftCodeKey } from '../types';
-import { SHIFT_CODES, buildMonthDays, dateToStr, isWithinEmployment } from '../constants';
+import { SHIFT_CODES, buildMonthDays, dateToStr, isWithinEmployment, isEmployedInRange, monthBounds } from '../constants';
 
 const NAME_COL = 1;      // B
 const FIRST_DAY_COL = 3; // D
@@ -136,10 +136,14 @@ function shiftStartEnd(code: ImportCode): { start: string; end: string } {
 }
 
 function scopedEmployees(employees: Employee[], scope: ScheduleImportScope): Employee[] {
+  // Şablon ve import planı, çizelgeyle aynı personel kümesi üzerinden çalışır:
+  // aralığı seçili ayla kesişmeyen personel her iki tarafta da yer almaz.
+  const { start, end } = monthBounds(scope.yearMonth);
   return employees.filter(e =>
     e.status === 'Aktif' &&
     e.station === scope.station &&
-    e.dept === scope.dept,
+    e.dept === scope.dept &&
+    isEmployedInRange(e.startDate, e.endDate, start, end),
   );
 }
 

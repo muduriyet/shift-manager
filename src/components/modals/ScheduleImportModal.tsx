@@ -7,7 +7,7 @@ import {
   type ScheduleImportPlan,
   type ScheduleImportScope,
 } from '../../lib/scheduleImport';
-import { MONTH_NAMES } from '../../constants';
+import { MONTH_NAMES, isEmployedInRange, monthBounds } from '../../constants';
 import { Dialog } from '../ui/Dialog';
 import { Button } from '../ui/Button';
 import { Select } from '../ui/Select';
@@ -103,10 +103,15 @@ export function ScheduleImportModal({
     ),
     [employees, deptNames, scope.station],
   );
-  const scopedEmployees = useMemo(
-    () => employees.filter(e => e.status === 'Aktif' && e.station === scope.station && e.dept === scope.dept),
-    [employees, scope.station, scope.dept],
-  );
+  // Sayaç, şablona/plana gerçekten girecek personeli göstermeli: çizelgedeki
+  // gibi aralığı seçili ayla kesişmeyenler hariç tutulur.
+  const scopedEmployees = useMemo(() => {
+    const bounds = scope.yearMonth ? monthBounds(scope.yearMonth) : null;
+    return employees.filter(e =>
+      e.status === 'Aktif' && e.station === scope.station && e.dept === scope.dept &&
+      (!bounds || isEmployedInRange(e.startDate, e.endDate, bounds.start, bounds.end)),
+    );
+  }, [employees, scope.station, scope.dept, scope.yearMonth]);
   // Seçilen ayın vardiyaları bellekte olmadan plan kurulamaz: eksik veriyle
   // mevcut kayıtlar "yok" görünür ve import onları yeniden oluşturmaya çalışır.
   const monthReady = !!scope.yearMonth && isMonthLoaded(scope.yearMonth);

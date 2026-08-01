@@ -49,6 +49,21 @@ export function isWithinEmployment(
   return true;
 }
 
+// Çalışma aralığı verilen dönemle kesişiyor mu. Kesişmiyorsa personelin o
+// dönemde tek bir günü bile yoktur; çizelgede satır açmak yalnızca tamamı
+// taralı, vardiya girilemeyen boş bir satır üretir.
+// start/end boş olan personel (tarihi girilmemiş) her dönemde görünür kalır.
+export function isEmployedInRange(
+  startDate: string | null,
+  endDate: string | null,
+  rangeStart: string,
+  rangeEnd: string,
+): boolean {
+  if (startDate && startDate > rangeEnd)   return false;
+  if (endDate   && endDate   < rangeStart) return false;
+  return true;
+}
+
 
 // ---- Date utilities ----
 

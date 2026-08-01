@@ -4,7 +4,7 @@ import {
   MONTH_NAMES, MONTH_SHORT_NAMES,
   TODAY_DATE, TODAY_DATE_STR, WORK_CODES,
   getMonday, addDays, buildWeekDays, buildMonthDays, getMonthLabel,
-  isWithinEmployment, monthsInRange, yearMonthOf,
+  isWithinEmployment, isEmployedInRange, monthsInRange, monthBounds, yearMonthOf,
 } from '../../constants';
 import { ShiftLoading } from '../ui/ShiftLoading';
 import { Stat } from '../ui/Stat';
@@ -127,10 +127,18 @@ export function ScheduleScreen({
     return emp ? isWithinEmployment(emp.startDate, emp.endDate, s.shiftDate) : true;
   });
 
-  // Stats use today's work shifts only (S, Ö, G)
+  // Çizelge satırları görüntülenen dönemde çalışan personelle sınırlıdır.
+  // Aralığı dönemle kesişmeyen personelin o dönemde girilebilecek tek bir günü
+  // yoktur; satırı açmak tamamı taralı, işlevsiz bir satır demektir.
+  const periodStart = mode === 'ay' ? monthBounds(activeMonth).start : weekDays[0].dateStr;
+  const periodEnd   = mode === 'ay' ? monthBounds(activeMonth).end   : weekDays[6].dateStr;
+  const periodEmps = filtered.filter(e => isEmployedInRange(e.startDate, e.endDate, periodStart, periodEnd));
+
+  // "Bugünkü Vardiya" hangi dönem görüntülenirse görüntülensin bugünü sayar,
+  // bu yüzden dönem kısıtından değil filteredShifts'ten türetilir.
   const todayShifts = filteredShifts.filter(s => s.shiftDate === TODAY_DATE_STR && (WORK_CODES as readonly string[]).includes(s.code));
   const stats = {
-    total: filtered.length,
+    total: periodEmps.length,
     today: todayShifts.length,
   };
 
@@ -143,11 +151,11 @@ export function ScheduleScreen({
   stationNames.forEach(st => deptNames.forEach(dp => {
     if (station !== 'Tümü' && st !== station) return;
     if (dept !== 'Tümü' && dp !== dept) return;
-    const emps = filtered.filter(e => e.station === st && e.dept === dp);
+    const emps = periodEmps.filter(e => e.station === st && e.dept === dp);
     if (emps.length) weekGroups.push({ label: `${st} / ${dp}`, color: deptColors[dp] ?? '#64748b', emps });
   }));
 
-  const monthGroups = buildMonthGroups(filtered, stationNames, deptNames, deptColors);
+  const monthGroups = buildMonthGroups(periodEmps, stationNames, deptNames, deptColors);
 
   const todayStr = `${TODAY_DATE.getDate()} ${MONTH_SHORT_NAMES[TODAY_DATE.getMonth()]} ${TODAY_DATE.getFullYear()}`;
 
