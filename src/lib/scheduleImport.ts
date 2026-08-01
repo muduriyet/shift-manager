@@ -208,6 +208,24 @@ export async function downloadScheduleTemplate(options: {
   );
 }
 
+// sheet_to_json satır dizilerini !ref'in BAŞLANGIÇ KOLONUNA göre indeksler,
+// A kolonuna göre değil. Şablonun A kolonu tamamen boş olduğu için (isimler B,
+// günler D'den başlar) Excel dosyayı kaydederken boş kolonu dimension'dan
+// düşürür ve !ref B1'e kayar; o andan itibaren tüm diziler bir kolon sola
+// kayarak okunur — isim kolonu boş görünür, 1. gün yerine 2. gün okunur.
+// Aralığı A1'den başlamaya zorlayarak indeksleri mutlak hale getiriyoruz.
+function sheetToAbsoluteRows(
+  XLSX: typeof import('xlsx'),
+  sheet: import('xlsx').WorkSheet,
+): unknown[][] {
+  const ref = sheet['!ref'];
+  if (!ref) return [];
+  const range = XLSX.utils.decode_range(ref);
+  range.s.c = 0;
+  range.s.r = 0;
+  return XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null, raw: false, range });
+}
+
 export async function buildScheduleImportPlan(options: {
   file: File;
   employees: Employee[];
@@ -219,9 +237,7 @@ export async function buildScheduleImportPlan(options: {
   const workbook = XLSX.read(bytes, { type: 'array' });
   const firstSheetName = workbook.SheetNames[0];
   const sheet = firstSheetName ? workbook.Sheets[firstSheetName] : null;
-  const rows = sheet
-    ? XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null, raw: false })
-    : [];
+  const rows = sheet ? sheetToAbsoluteRows(XLSX, sheet) : [];
 
   return buildPlanFromRows(rows, options);
 }
