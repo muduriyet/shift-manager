@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Shift, Employee, ShiftCodeKey, ScheduleMode, MonthGroup } from '../../types';
 import {
   MONTH_NAMES, MONTH_SHORT_NAMES,
   TODAY_DATE, TODAY_DATE_STR, WORK_CODES,
   getMonday, addDays, buildWeekDays, buildMonthDays, getMonthLabel,
-  isWithinEmployment,
+  isWithinEmployment, monthsInRange, yearMonthOf,
 } from '../../constants';
+import { ShiftLoading } from '../ui/ShiftLoading';
 import { Stat } from '../ui/Stat';
 import { Button } from '../ui/Button';
 import { DropdownButton } from '../ui/DropdownButton';
@@ -55,6 +56,8 @@ interface ScheduleScreenProps {
   setActiveMonth: (m: string) => void;
   codesOf: (id: number) => ShiftCodeKey[];
   setCode: (id: number, idx: number, code: ShiftCodeKey) => void;
+  ensureMonths: (months: string[]) => void;
+  isMonthPending: (yearMonth: string) => boolean;
   onNewShift: () => void;
   onExport: () => void;
   onImport: () => void;
@@ -66,7 +69,8 @@ export function ScheduleScreen({
   shifts, employees, stationNames, deptNames, deptColors,
   station, setStation, dept, setDept,
   mode, setMode, activeMonth, setActiveMonth,
-  codesOf, setCode, onNewShift, onExport, onImport, onShiftClick, onCellAdd,
+  codesOf, setCode, ensureMonths, isMonthPending,
+  onNewShift, onExport, onImport, onShiftClick, onCellAdd,
 }: ScheduleScreenProps) {
   // ---- Week navigation ----
   const [weekStart, setWeekStart] = useState<Date>(() => getMonday(TODAY_DATE));
@@ -90,6 +94,23 @@ export function ScheduleScreen({
 
   function prevMonth() { setActiveMonth(shiftYearMonth(activeMonth, -1)); }
   function nextMonth() { setActiveMonth(shiftYearMonth(activeMonth, +1)); }
+
+  // ---- Görünen aralığın vardiyalarını iste ----
+  // Hafta iki aya taşabildiği için aralıktaki tüm aylar istenir. Zaten yüklü
+  // aylar için ensureMonths istek açmaz, bu yüzden her renderda çağrılması
+  // güvenlidir.
+  const weekMonths = monthsInRange(weekDays[0].dateStr, weekDays[6].dateStr);
+  const viewMonths = mode === 'ay' ? [activeMonth] : weekMonths;
+  // "Bugünkü Vardiya" istatistiği hangi ay görüntülenirse görüntülensin bugünü
+  // saydığı için içinde bulunduğumuz ay da daima yüklü tutulur.
+  const neededKey = Array.from(new Set([...viewMonths, yearMonthOf(TODAY_DATE_STR)])).join(',');
+  useEffect(() => {
+    ensureMonths(neededKey.split(','));
+  }, [neededKey, ensureMonths]);
+
+  // Yalnız görüntülenen aralık beklenirken tablo gizlenir; bugünün ayı arka
+  // planda gelebilir, çizelgeyi bloklamaz.
+  const rangePending = viewMonths.some(isMonthPending);
 
   // ---- Filters ----
   const activeEmps = employees.filter(e => e.status === 'Aktif');
@@ -206,7 +227,10 @@ export function ScheduleScreen({
         </div>
       </div>
 
-      {mode === 'ay' && (
+      {/* Ay henüz gelmediyse boş çizelge yerine yükleniyor gösterilir; aksi halde
+          "bu ayda vardiya yok" gibi yanlış bir izlenim oluşur. */}
+      {rangePending && <ShiftLoading label={mode === 'ay' ? monthName : weekLabel} />}
+      {!rangePending && mode === 'ay' && (
         <MonthlyView
           groups={monthGroups}
           codesOf={codesOf}
@@ -217,7 +241,7 @@ export function ScheduleScreen({
           activeMonth={activeMonth}
         />
       )}
-      {mode === 'hafta' && (
+      {!rangePending && mode === 'hafta' && (
         <WeeklyView
           groups={weekGroups}
           shifts={weekShifts}

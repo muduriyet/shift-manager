@@ -1,8 +1,9 @@
 import { useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import type { ViewId, ScheduleMode, Employee, Shift, ShiftStatus, ShiftCodeKey, StationName, DepartmentName, RoleName, Station, Department, Role, SalesImportConfig, Task, Profile } from './types';
 import { SHIFT_CODES, WORK_CODES, isWithinEmployment } from './constants';
+import { useShiftStore } from './hooks/useShiftStore';
 import {
-  fetchEmployees, fetchShifts,
+  fetchEmployees,
   createEmployee, updateEmployee, setEmployeeActive,
   createShift, updateShift, updateShiftStatus, deleteShift,
   fetchStations, createStation, deleteStation,
@@ -137,7 +138,8 @@ export default function App() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [roles,       setRoles]       = useState<Role[]>([]);
   const [employees,   setEmployees]   = useState<Employee[]>([]);
-  const [shifts,      setShifts]      = useState<Shift[]>([]);
+  const shiftStore = useShiftStore();
+  const { shifts, setShifts, ensureMonths, isMonthPending } = shiftStore;
   const [salesConfigs, setSalesConfigs] = useState<SalesImportConfig[]>([]);
   const [tasks,       setTasks]       = useState<Task[]>([]);
   const [profiles,    setProfiles]    = useState<Profile[]>([]);
@@ -162,6 +164,7 @@ export default function App() {
   useEffect(() => { setDrawer(false); }, [view]);
 
   // Oturum kapısı: açılışta mevcut oturumu oku, sonra login/logout/token değişimlerini dinle.
+  const resetShifts = shiftStore.reset;
   useEffect(() => {
     let mounted = true;
     getCurrentSession()
@@ -171,14 +174,16 @@ export default function App() {
       setSession(s);
       if (!s) {
         // SIGNED_OUT / token yenilenemedi: bellekteki veriyi temizle, login'e dön.
-        setEmployees([]); setShifts([]);
+        // resetShifts yüklenmiş ay kümesini de sıfırlar; yeni oturumda aylar
+        // "zaten yüklü" sanılıp atlanmaz.
+        setEmployees([]); resetShifts();
         setStations([]); setDepartments([]); setRoles([]); setSalesConfigs([]);
         setTasks([]); setProfiles([]);
         setLoadError(null); setLoading(true);
       }
     });
     return () => { mounted = false; unsub(); };
-  }, []);
+  }, [resetShifts]);
 
   // Veri yükleme yalnızca oturum açıkken çalışır (girişten önce fetch yok).
   // userId'ye bağlı: token yenilenince (aynı kullanıcı) tekrar yüklemez.
@@ -189,16 +194,18 @@ export default function App() {
     setLoading(true);
     async function load() {
       try {
-        const [sts, depts, rls, emps, shfts, sconfigs, tsks, profs] = await Promise.all([
-          fetchStations(), fetchDepartments(), fetchRoles(), fetchEmployees(), fetchShifts(), fetchSalesConfigs(),
+        // Vardiyalar burada topluca çekilmez: yalnızca açılışta gösterilen ay
+        // yüklenir, diğer aylar ekranlar istedikçe gelir (bkz. useShiftStore).
+        const [sts, depts, rls, emps, sconfigs, tsks, profs] = await Promise.all([
+          fetchStations(), fetchDepartments(), fetchRoles(), fetchEmployees(), fetchSalesConfigs(),
           fetchTasks(), fetchProfiles(),
+          ensureMonths([activeMonth]),
         ]);
         if (!active) return;
         setStations(sts);
         setDepartments(depts);
         setRoles(rls);
         setEmployees(emps);
-        setShifts(shfts);
         setSalesConfigs(sconfigs);
         setTasks(tsks);
         setProfiles(profs);
@@ -575,6 +582,7 @@ export default function App() {
           mode={mode} setMode={setMode}
           activeMonth={activeMonth} setActiveMonth={setActiveMonth}
           codesOf={codesOf} setCode={setCode}
+          ensureMonths={ensureMonths} isMonthPending={isMonthPending}
           onNewShift={() => { setShiftToEdit(null); setShiftModalOpen(true); }}
           onExport={() => setExportModalOpen(true)}
           onImport={() => setImportModalOpen(true)}
@@ -616,6 +624,7 @@ export default function App() {
           station={station} setStation={setStation}
           dept={dept} setDept={setDept}
           setStatus={handleSetStatus}
+          ensureMonths={ensureMonths} isMonthPending={isMonthPending}
         />
       );
       break;
@@ -631,7 +640,16 @@ export default function App() {
       );
       break;
     case 'raporlar':
-      screen = <ReportsScreen employees={employees} shifts={shifts} stationNames={stationNames} deptNames={deptNames} />;
+      screen = (
+        <ReportsScreen
+          employees={employees}
+          shifts={shifts}
+          stationNames={stationNames}
+          deptNames={deptNames}
+          ensureMonths={ensureMonths}
+          isMonthPending={isMonthPending}
+        />
+      );
       break;
     case 'ayarlar':
       screen = (
@@ -724,6 +742,8 @@ export default function App() {
           initialStation={station}
           initialDept={dept}
           initialMonth={activeMonth}
+          ensureMonths={ensureMonths}
+          isMonthLoaded={shiftStore.isMonthLoaded}
           onClose={() => setImportModalOpen(false)}
           onApply={handleApplyScheduleImport}
         />
@@ -737,6 +757,8 @@ export default function App() {
           initialStation={station}
           initialDept={dept}
           initialMonth={activeMonth}
+          ensureMonths={ensureMonths}
+          isMonthLoaded={shiftStore.isMonthLoaded}
           onClose={() => setExportModalOpen(false)}
         />
       )}

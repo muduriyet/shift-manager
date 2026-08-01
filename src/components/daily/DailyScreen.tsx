@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Shift, Employee, ShiftStatus } from '../../types';
-import { SHIFT_CODES, WORK_CODES, TODAY_DATE, addDays, dateToStr, MONTH_NAMES, isWithinEmployment } from '../../constants';
+import { SHIFT_CODES, WORK_CODES, TODAY_DATE, addDays, dateToStr, MONTH_NAMES, isWithinEmployment, yearMonthOf } from '../../constants';
+import { ShiftLoading } from '../ui/ShiftLoading';
 import { Stat } from '../ui/Stat';
 import { Badge } from '../ui/Badge';
 import { Avatar } from '../ui/Avatar';
@@ -26,11 +27,18 @@ interface DailyScreenProps {
   dept: string;
   setDept: (d: string) => void;
   setStatus: (shiftId: number, status: ShiftStatus) => void;
+  ensureMonths: (months: string[]) => void;
+  isMonthPending: (yearMonth: string) => boolean;
 }
 
-export function DailyScreen({ shifts, employees, stationNames, deptNames, station, setStation, dept, setDept, setStatus }: DailyScreenProps) {
+export function DailyScreen({ shifts, employees, stationNames, deptNames, station, setStation, dept, setDept, setStatus, ensureMonths, isMonthPending }: DailyScreenProps) {
   const [viewDate, setViewDate] = useState<Date>(() => addDays(TODAY_DATE, -1));
   const viewDateStr = dateToStr(viewDate);
+
+  // Gün gezinmesi ay sınırını aşabilir; görüntülenen günün ayını iste.
+  const viewMonth = yearMonthOf(viewDateStr);
+  useEffect(() => { ensureMonths([viewMonth]); }, [viewMonth, ensureMonths]);
+  const monthPending = isMonthPending(viewMonth);
 
   const isToday = viewDateStr === dateToStr(TODAY_DATE);
   const isYesterday = viewDateStr === dateToStr(addDays(TODAY_DATE, -1));
@@ -126,7 +134,9 @@ export function DailyScreen({ shifts, employees, stationNames, deptNames, statio
         </div>
 
         <div className="att-list">
-          {rows.length === 0 ? (
+          {monthPending ? (
+            <ShiftLoading label={dayLabel} />
+          ) : rows.length === 0 ? (
             <EmptyState
               icon="clipboard"
               title="Bu filtrede vardiya yok"

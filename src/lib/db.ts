@@ -236,9 +236,17 @@ export async function setEmployeeActive(id: number, active: boolean): Promise<Em
 
 // ---- Shifts ----
 
-export async function fetchShifts(): Promise<Shift[]> {
+// Tüm çizelge ekranları tarih aralığıyla çalıştığı için vardiyalar aralık aralık
+// çekilir; tablonun tamamı hiçbir zaman belleğe alınmaz. Aralık büyük olsa bile
+// fetchAllRows sayfalama yaptığından 1000 satır limiti sorun olmaz.
+export async function fetchShiftsInRange(fromDate: string, toDate: string): Promise<Shift[]> {
   const rows = await fetchAllRows<ShiftRow>(
-    () => supabase().from('shifts').select('*').order('id'),
+    () => supabase()
+      .from('shifts')
+      .select('*')
+      .gte('shift_date', fromDate)
+      .lte('shift_date', toDate)
+      .order('id'),
   );
   return rows.map(toShift);
 }

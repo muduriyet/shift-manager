@@ -22,6 +22,8 @@ interface ScheduleImportModalProps {
   initialStation: string;
   initialDept: string;
   initialMonth: string;
+  ensureMonths: (months: string[]) => void;
+  isMonthLoaded: (yearMonth: string) => boolean;
   onClose: () => void;
   onApply: (plan: ScheduleImportPlan) => Promise<ScheduleImportApplyResult>;
 }
@@ -67,6 +69,8 @@ export function ScheduleImportModal({
   initialStation,
   initialDept,
   initialMonth,
+  ensureMonths,
+  isMonthLoaded,
   onClose,
   onApply,
 }: ScheduleImportModalProps) {
@@ -103,7 +107,14 @@ export function ScheduleImportModal({
     () => employees.filter(e => e.status === 'Aktif' && e.station === scope.station && e.dept === scope.dept),
     [employees, scope.station, scope.dept],
   );
-  const canUseScope = !!scope.station && !!scope.dept && !!scope.yearMonth;
+  // Seçilen ayın vardiyaları bellekte olmadan plan kurulamaz: eksik veriyle
+  // mevcut kayıtlar "yok" görünür ve import onları yeniden oluşturmaya çalışır.
+  const monthReady = !!scope.yearMonth && isMonthLoaded(scope.yearMonth);
+  useEffect(() => {
+    if (scope.yearMonth) ensureMonths([scope.yearMonth]);
+  }, [scope.yearMonth, ensureMonths]);
+
+  const canUseScope = !!scope.station && !!scope.dept && !!scope.yearMonth && monthReady;
   const needsConfirm = (plan?.existingCount ?? 0) > 0 || (plan?.summary.delete ?? 0) > 0;
   const canApply = !!plan && plan.canApply && (!needsConfirm || confirmed) && !busy;
 
@@ -267,6 +278,12 @@ export function ScheduleImportModal({
             <Icon name="users" size={16} />
             <span>{scopeLabel(scope)} · {scopedEmployees.length} aktif personel</span>
           </div>
+          {!!scope.yearMonth && !monthReady && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9, color: 'var(--muted-foreground)', fontSize: 13 }}>
+              <Icon name="clock" size={16} />
+              <span>Seçili ayın vardiyaları yükleniyor…</span>
+            </div>
+          )}
           <Field label="Excel Dosyası">
             <div
               style={{

@@ -19,6 +19,8 @@ interface ScheduleExportModalProps {
   initialStation: string;
   initialDept: string;
   initialMonth: string;
+  ensureMonths: (months: string[]) => void;
+  isMonthLoaded: (yearMonth: string) => boolean;
   onClose: () => void;
 }
 
@@ -40,6 +42,8 @@ export function ScheduleExportModal({
   initialStation,
   initialDept,
   initialMonth,
+  ensureMonths,
+  isMonthLoaded,
   onClose,
 }: ScheduleExportModalProps) {
   const [scope, setScope] = useState<ScheduleExportScope>({
@@ -75,7 +79,13 @@ export function ScheduleExportModal({
     ),
     [employees, scope.station, scope.dept],
   );
-  const canExport = !!scope.station && !!scope.dept && !!scope.yearMonth && scopedEmployees.length > 0 && !busy;
+  // Seçilen ay bellekte değilken dışa aktarım boş/eksik bir çizelge üretirdi.
+  const monthReady = !!scope.yearMonth && isMonthLoaded(scope.yearMonth);
+  useEffect(() => {
+    if (scope.yearMonth) ensureMonths([scope.yearMonth]);
+  }, [scope.yearMonth, ensureMonths]);
+
+  const canExport = !!scope.station && !!scope.dept && !!scope.yearMonth && monthReady && scopedEmployees.length > 0 && !busy;
 
   function resetResult() {
     setError('');
@@ -184,6 +194,12 @@ export function ScheduleExportModal({
             <Icon name="users" size={16} />
             <span>{scopeLabel(scope)} · {scopedEmployees.length} aktif personel</span>
           </div>
+          {!!scope.yearMonth && !monthReady && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9, color: 'var(--muted-foreground)', fontSize: 13 }}>
+              <Icon name="clock" size={16} />
+              <span>Seçili ayın vardiyaları yükleniyor…</span>
+            </div>
+          )}
           {error && <div style={{ color: 'var(--absent-fg)', fontSize: 13 }}>{error}</div>}
           {result && (
             <div style={{ border: '1px solid var(--came-bd)', background: 'var(--came-bg)', color: 'var(--came-fg)', borderRadius: 8, padding: 12, fontSize: 13 }}>

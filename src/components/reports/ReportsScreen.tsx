@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { Employee, Shift } from '../../types';
 import {
   SHIFT_CODES, WORK_CODES,
   TODAY_DATE, THIS_WEEK_START, addDays, dateToStr, MONTH_SHORT_NAMES,
-  isWithinEmployment,
+  isWithinEmployment, monthsInRange,
 } from '../../constants';
+import { ShiftLoading } from '../ui/ShiftLoading';
 import { exportRowsToExcel } from '../../lib/excel';
 import { Button } from '../ui/Button';
 import { Select } from '../ui/Select';
@@ -75,9 +76,11 @@ interface ReportsScreenProps {
   shifts: Shift[];
   stationNames: string[];
   deptNames: string[];
+  ensureMonths: (months: string[]) => void;
+  isMonthPending: (yearMonth: string) => boolean;
 }
 
-export function ReportsScreen({ employees, shifts, stationNames, deptNames }: ReportsScreenProps) {
+export function ReportsScreen({ employees, shifts, stationNames, deptNames, ensureMonths, isMonthPending }: ReportsScreenProps) {
   const [period,     setPeriod]     = useState<Period>('Bu Hafta');
   const [station,    setStation]    = useState('Tümü');
   const [dept,       setDept]       = useState('Tümü');
@@ -86,6 +89,18 @@ export function ReportsScreen({ employees, shifts, stationNames, deptNames }: Re
 
   const range = useMemo(() => periodRange(period),     [period]);
   const prev  = useMemo(() => prevPeriodRange(period), [period]);
+
+  // Rapor, seçili dönemin yanında karşılaştırma dönemini de hesapladığı için
+  // her iki aralığın kapsadığı aylar istenir.
+  const neededKey = useMemo(() => {
+    const months = [
+      ...monthsInRange(range.start, range.end),
+      ...(prev ? monthsInRange(prev.start, prev.end) : []),
+    ];
+    return Array.from(new Set(months)).join(',');
+  }, [range, prev]);
+  useEffect(() => { ensureMonths(neededKey.split(',')); }, [neededKey, ensureMonths]);
+  const periodPending = neededKey.split(',').some(isMonthPending);
 
   // İstihdam penceresi dışındaki vardiyalar rapora dahil edilmez (geçmiş kayıtta korunur).
   const empById = useMemo(() => new Map(employees.map(e => [e.id, e])), [employees]);
@@ -251,6 +266,11 @@ export function ReportsScreen({ employees, shifts, stationNames, deptNames }: Re
         />
       </div>
 
+      {/* Dönemin ayları gelmeden kartlar sıfır/boş gösterilirse rapor yanlış
+          okunur; onun yerine yükleniyor durumu gösterilir. */}
+      {periodPending && <ShiftLoading label={range.label} />}
+
+      {!periodPending && (
       <div className="report-grid">
         {reports.map((r, i) => {
           const { bg, fg } = TONE_STYLES[r.tone];
@@ -276,6 +296,7 @@ export function ReportsScreen({ employees, shifts, stationNames, deptNames }: Re
           );
         })}
       </div>
+      )}
 
       {absentOpen && (
         <Dialog

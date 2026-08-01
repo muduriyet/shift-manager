@@ -79,6 +79,42 @@ export function dateToStr(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+// ---- Ay (YYYY-MM) yardımcıları ----
+// Vardiyalar sunucudan ay ay çekilir; aşağıdakiler bir tarih aralığının hangi
+// aylara denk geldiğini bulmak için kullanılır.
+
+export function yearMonthOf(dateStr: string): string {
+  return dateStr.slice(0, 7);
+}
+
+export function addMonths(yearMonth: string, delta: number): string {
+  const [y, m] = yearMonth.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+export function monthBounds(yearMonth: string): { start: string; end: string } {
+  const [y, m] = yearMonth.split('-').map(Number);
+  const last = new Date(y, m, 0).getDate();
+  return {
+    start: `${yearMonth}-01`,
+    end:   `${yearMonth}-${String(last).padStart(2, '0')}`,
+  };
+}
+
+// Aralığın kapsadığı tüm ayları sırayla döndürür ('2026-06' → '2026-07' …).
+export function monthsInRange(startDate: string, endDate: string): string[] {
+  if (!startDate || !endDate || startDate > endDate) return [];
+  const months: string[] = [];
+  let cur = yearMonthOf(startDate);
+  const last = yearMonthOf(endDate);
+  while (cur <= last) {
+    months.push(cur);
+    cur = addMonths(cur, 1);
+  }
+  return months;
+}
+
 export function buildWeekDays(weekStart: Date): WeekDay[] {
   return Array.from({ length: 7 }, (_, i) => {
     const d = addDays(weekStart, i);
