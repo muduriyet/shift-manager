@@ -10,6 +10,25 @@ import type {
 
 const supabase = () => getSupabaseClient();
 
+// PostgREST tek istekte en fazla 1000 satır döndürür (db-max-rows). Satır sayısı
+// bunu aşan tablolarda sessizce kırpılma olur; bu yüzden büyüyen tabloları
+// .range() ile sayfa sayfa çekiyoruz.
+const PAGE_SIZE = 1000;
+
+async function fetchAllRows<T>(
+  build: () => { range: (from: number, to: number) => PromiseLike<{ data: unknown; error: unknown }> },
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await build().range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    const page = (data ?? []) as T[];
+    rows.push(...page);
+    if (page.length < PAGE_SIZE) break;
+  }
+  return rows;
+}
+
 // ---- Stations & Departments ----
 
 interface StationRow   { id: number; name: string; }
@@ -218,9 +237,10 @@ export async function setEmployeeActive(id: number, active: boolean): Promise<Em
 // ---- Shifts ----
 
 export async function fetchShifts(): Promise<Shift[]> {
-  const { data, error } = await supabase().from('shifts').select('*').order('id');
-  if (error) throw error;
-  return (data as ShiftRow[]).map(toShift);
+  const rows = await fetchAllRows<ShiftRow>(
+    () => supabase().from('shifts').select('*').order('id'),
+  );
+  return rows.map(toShift);
 }
 
 export async function createShift(form: {
@@ -468,12 +488,10 @@ export async function fetchSalesReportForScope(
 }
 
 export async function fetchSalesReports(): Promise<SalesDailyReport[]> {
-  const { data, error } = await supabase()
-    .from('sales_daily_reports')
-    .select('*')
-    .order('report_date');
-  if (error) throw error;
-  return (data as SalesReportRow[]).map(toSalesReport);
+  const rows = await fetchAllRows<SalesReportRow>(
+    () => supabase().from('sales_daily_reports').select('*').order('report_date').order('id'),
+  );
+  return rows.map(toSalesReport);
 }
 
 // ---- Satış: dashboard view ----
@@ -509,12 +527,10 @@ function toDailyView(r: SalesDailyViewRow): SalesDailyView {
 }
 
 export async function fetchSalesDashboardDaily(): Promise<SalesDailyView[]> {
-  const { data, error } = await supabase()
-    .from('sales_dashboard_daily_view')
-    .select('*')
-    .order('report_date');
-  if (error) throw error;
-  return (data as SalesDailyViewRow[]).map(toDailyView);
+  const rows = await fetchAllRows<SalesDailyViewRow>(
+    () => supabase().from('sales_dashboard_daily_view').select('*').order('report_date').order('id'),
+  );
+  return rows.map(toDailyView);
 }
 
 // Veri Gezgini "Ham Tablo" inline düzenlemesi → temel tabloya (view değil) id ile yazar.
@@ -700,13 +716,10 @@ function nextDueDate(base: Date, kind: RepeatKind, n: number, unit: RepeatUnit):
 }
 
 export async function fetchTasks(): Promise<Task[]> {
-  const { data, error } = await supabase()
-    .from('tasks')
-    .select('*')
-    .is('archived_at', null)
-    .order('id');
-  if (error) throw error;
-  return (data as TaskRow[]).map(toTask);
+  const rows = await fetchAllRows<TaskRow>(
+    () => supabase().from('tasks').select('*').is('archived_at', null).order('id'),
+  );
+  return rows.map(toTask);
 }
 
 export async function createTask(form: TaskForm, createdBy: string | null): Promise<Task> {
