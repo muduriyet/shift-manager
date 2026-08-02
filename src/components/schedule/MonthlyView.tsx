@@ -146,14 +146,17 @@ export function MonthlyView({ groups, codesOf, setCodes, busy, monthDays, todayM
     selectingRef.current = true;
     setPicker(null); setWarning(null);
   }
+  // selRef doğrudan burada güncellenir, setSel updater'ının içinde değil.
+  // Updater render aşamasında çalıştığı için ref bir adım geride kalabiliyordu:
+  // son mouseover ile mouseup aynı partiye düşerse mouseup, çok hücreli seçimi
+  // hâlâ tek hücre sanıp seçiciyi hiç açmıyordu (seçim sessizce kayboluyordu).
   function extendSel(r: number, c: number) {
-    if (selectingRef.current) {
-      setSel(s => {
-        const next = s ? { ...s, b: { r, c } } : s;
-        selRef.current = next;
-        return next;
-      });
-    }
+    if (!selectingRef.current) return;
+    const prev = selRef.current;
+    if (!prev) return;
+    const next = { ...prev, b: { r, c } };
+    selRef.current = next;
+    setSel(next);
   }
   function applyCode(code: ShiftCodeKey) {
     if (!bounds || busy) return;
