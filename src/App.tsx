@@ -335,7 +335,11 @@ export default function App() {
         start: isWork ? sc.start! : '',
         end:   isWork ? sc.end!   : '',
         role: emp.role, station: emp.station, dept: emp.dept,
-        status: 'Planlandı',
+        // Izgarada kod düzeltmek devam kaydını silmez: mevcut kaydın durumu
+        // (Geldi/Gelmedi) korunur, yalnızca yeni kayıt Planlandı başlar.
+        // Excel import'u bilinçli olarak Planlandı'ya çeker; ızgara düzeltmesi
+        // ondan farklıdır ve öyle kalmalı.
+        status: existing?.status ?? 'Planlandı',
         note: existing?.note ?? '',
       });
     }
