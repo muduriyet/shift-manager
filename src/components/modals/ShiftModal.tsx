@@ -53,8 +53,10 @@ export function ShiftModal({ shift, employees, stationNames, deptNames, roleName
 
   const [form, setForm] = useState<ShiftFormData>({
     empId:     shift?.empId     ?? (employees.find(e => e.status === 'Aktif')?.id ?? employees[0]?.id ?? 0),
-    station:   shift?.station   ?? emp0?.station ?? stationNames[0] ?? '',
-    dept:      shift?.dept      ?? emp0?.dept    ?? deptNames[0]    ?? '',
+    // Personelinki önce gelir: kayıtta eski/sapmış bir şube kalmışsa salt-okunur
+    // alan yanlış değeri göstermesin.
+    station:   emp0?.station ?? shift?.station ?? stationNames[0] ?? '',
+    dept:      emp0?.dept    ?? shift?.dept    ?? deptNames[0]    ?? '',
     shiftDate: shift?.shiftDate ?? TODAY_DATE_STR,
     start:     shift?.start     ?? '08:00',
     end:       shift?.end       ?? '16:00',
@@ -127,11 +129,15 @@ export function ShiftModal({ shift, employees, stationNames, deptNames, roleName
           </Field>
         </div>
 
-        <Field label="İstasyon">
-          <Select value={form.station} onChange={v => set('station', v as StationName)} icon="pin" options={stationNames} />
+        {/* İstasyon/departman personelden türetilir, elle değiştirilemez.
+            Serbest bırakıldığında vardiya personelin şubesinden farklı
+            kaydedilebiliyordu: çizelge personelin şubesine göre grupluyor,
+            raporlar vardiyanınkine göre sayıyor — aynı kayıt iki yere düşüyordu. */}
+        <Field label="İstasyon" hint="Personelden alınır">
+          <Select value={form.station} onChange={() => {}} icon="pin" options={stationNames} disabled />
         </Field>
-        <Field label="Departman">
-          <Select value={form.dept} onChange={v => set('dept', v as DepartmentName)} icon="layers" options={deptNames} />
+        <Field label="Departman" hint="Personelden alınır">
+          <Select value={form.dept} onChange={() => {}} icon="layers" options={deptNames} disabled />
         </Field>
 
         <div className="col-2">

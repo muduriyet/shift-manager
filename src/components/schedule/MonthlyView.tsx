@@ -50,7 +50,10 @@ function defaultOrder(g: MonthGroup, codesOf: (id: number) => ShiftCodeKey[], so
 interface MonthlyViewProps {
   groups: MonthGroup[];
   codesOf: (id: number) => ShiftCodeKey[];
-  setCode: (id: number, idx: number, code: ShiftCodeKey) => void;
+  /** Seçili hücrelerin tamamına tek çağrıda kod uygular. */
+  setCodes: (cells: Array<{ empId: number; dayIdx: number }>, code: ShiftCodeKey) => void;
+  /** Yazma sürerken yeni seçim/atama kabul edilmez. */
+  busy: boolean;
   monthDays: MonthDay[];
   todayMidx: number;
   monthShort: string;
@@ -64,7 +67,7 @@ function fmtDate(iso: string): string {
   return `${parseInt(d)} ${MONTH_NAMES_TR[parseInt(m) - 1]} ${y}`;
 }
 
-export function MonthlyView({ groups, codesOf, setCode, monthDays, todayMidx, monthShort, activeMonth }: MonthlyViewProps) {
+export function MonthlyView({ groups, codesOf, setCodes, busy, monthDays, todayMidx, monthShort, activeMonth }: MonthlyViewProps) {
   const [sel, setSel] = useState<Selection | null>(null);
   const [picker, setPicker] = useState<PickerPos | null>(null);
   const [warning, setWarning] = useState<{ x: number; y: number; msg: string } | null>(null);
@@ -135,7 +138,7 @@ export function MonthlyView({ groups, codesOf, setCode, monthDays, todayMidx, mo
   const selCount = bounds ? (bounds.r2 - bounds.r1 + 1) * (bounds.c2 - bounds.c1 + 1) : 0;
 
   function startSel(r: number, c: number, e: React.MouseEvent) {
-    if (e.button !== 0 || drag) return;
+    if (e.button !== 0 || drag || busy) return;
     e.preventDefault();
     const next = { a: { r, c }, b: { r, c } };
     selRef.current = next;
@@ -153,12 +156,15 @@ export function MonthlyView({ groups, codesOf, setCode, monthDays, todayMidx, mo
     }
   }
   function applyCode(code: ShiftCodeKey) {
-    if (!bounds) return;
+    if (!bounds || busy) return;
+    // Seçimin tamamı tek çağrıda gönderilir; hücre başına istek atılmaz.
+    const cells: Array<{ empId: number; dayIdx: number }> = [];
     flat.forEach((emp, r) => {
       if (r < bounds.r1 || r > bounds.r2) return;
-      for (let c = bounds.c1; c <= bounds.c2; c++) setCode(emp.id, c, code);
+      for (let c = bounds.c1; c <= bounds.c2; c++) cells.push({ empId: emp.id, dayIdx: c });
     });
     setSel(null); setPicker(null);
+    setCodes(cells, code);
   }
 
   function empDown(emp: Employee, groupLabel: string, e: React.MouseEvent) {

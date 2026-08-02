@@ -63,6 +63,13 @@ export interface ScheduleImportPlan {
   existingCount: number;
   statusPreservedCount: number;
   resetStatusCount: number;
+  /**
+   * Import hiçbir kayıt oluşturmuyor/güncellemiyor, yalnızca siliyor. Yanlışlıkla
+   * boş bir şablon yüklemenin tipik sonucu budur, o yüzden ayrı bir onay ister.
+   */
+  deleteOnly: boolean;
+  /** Excel'de tek bir vardiya kodu bile yok (tüm eşleşen satırlar boş). */
+  noCodesInSheet: boolean;
   summary: {
     create: number;
     update: number;
@@ -423,7 +430,14 @@ function buildPlanFromRows(
   let resetStatusCount = 0;
   let ozPreservedCount = 0;
 
+  // Dosya hiç okunamadıysa ya da düzeni tanınmadıysa aksiyon üretilmez.
+  // Aksi halde "hiç kod okunamadı" durumu "her hücre boş" gibi yorumlanıp
+  // ayın tamamı için silme planı çıkıyor ve özet ekranında "Silinecek 505"
+  // gibi yanıltıcı bir rakam görünüyordu.
+  const layoutUsable = formatErrors.length === 0;
+
   people.forEach(emp => {
+    if (!layoutUsable) return;
     const desiredRow = desiredByEmployee.get(emp.id);
     days.forEach((dateStr, dayIdx) => {
       if (!isWithinEmployment(emp.startDate, emp.endDate, dateStr)) return;
@@ -473,6 +487,15 @@ function buildPlanFromRows(
     duplicateScheduleNames.length === 0 &&
     emptyScheduleNameEmployees.length === 0;
 
+  const deleteOnly = summary.create === 0 && summary.update === 0 && summary.delete > 0;
+  const noCodesInSheet = parsedRows.length > 0 && parsedRows.every(r => r.codes.every(c => !c));
+  if (noCodesInSheet && summary.delete > 0) {
+    warnings.push(
+      `Excel'de hiç vardiya kodu yok. Uygulanırsa seçili ayın ${summary.delete} kaydı silinir — ` +
+      'yanlış ya da boş bir şablon yüklemiş olabilirsiniz.',
+    );
+  }
+
   return {
     scope,
     days,
@@ -488,6 +511,8 @@ function buildPlanFromRows(
     existingCount: existingShifts.length,
     statusPreservedCount,
     resetStatusCount,
+    deleteOnly,
+    noCodesInSheet,
     summary,
     canApply,
   };

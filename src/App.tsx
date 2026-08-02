@@ -1,11 +1,11 @@
-import { useState, useCallback, useEffect, lazy, Suspense } from 'react';
+import { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
 import type { ViewId, ScheduleMode, Employee, Shift, ShiftStatus, ShiftCodeKey, StationName, DepartmentName, RoleName, Station, Department, Role, SalesImportConfig, Task, Profile } from './types';
 import { SHIFT_CODES, WORK_CODES, isWithinEmployment, yearMonthOf } from './constants';
 import { useShiftStore } from './hooks/useShiftStore';
 import {
   fetchEmployees,
   createEmployee, updateEmployee, setEmployeeActive,
-  createShift, updateShift, updateShiftStatus, deleteShift,
+  createShift, updateShift, updateShiftStatus,
   applyScheduleImport, type ScheduleImportRow,
   fetchStations, createStation, deleteStation,
   fetchDepartments, createDepartment, deleteDepartment,
@@ -159,6 +159,8 @@ export default function App() {
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [drawer, setDrawer] = useState(false);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  // Izgarada toplu kod ataması sürerken yeni seçim/atama kabul edilmez.
+  const [gridBusy, setGridBusy] = useState(false);
 
   useEffect(() => { localStorage.setItem('vy_view', view); }, [view]);
   useEffect(() => { localStorage.setItem('vy_mode', mode); }, [mode]);
@@ -292,49 +294,76 @@ export default function App() {
     return result;
   }, [shifts, activeMonth]);
 
-  const setCode = useCallback((id: number, idx: number, code: ShiftCodeKey) => {
+  // Izgarada kod atama (tek hücre de çok hücre de buradan geçer).
+  // Önceden hücre başına bir istek atılıyor ve hepsi aynı anda başlatılıyordu:
+  // 620 hücrelik bir seçim 620 paralel istek demekti — yavaş, geri bildirimsiz
+  // ve yarıda kesilirse tutarsız. Artık tek RPC, tek transaction.
+  const gridBusyRef = useRef(false);
+  const setCodes = useCallback(async (cells: Array<{ empId: number; dayIdx: number }>, code: ShiftCodeKey) => {
+    if (!cells.length) return;
+    if (gridBusyRef.current) { toast('Önceki atama sürüyor, lütfen bekleyin'); return; }
+
     const [y, m] = activeMonth.split('-').map(Number);
-    const dateStr = `${y}-${String(m).padStart(2, '0')}-${String(idx + 1).padStart(2, '0')}`;
-    const emp = employees.find(e => e.id === id);
-    if (!emp) return;
-
-    const existing = shifts.find(s => s.empId === id && s.shiftDate === dateStr);
-
-    if (!isWithinEmployment(emp.startDate, emp.endDate, dateStr)) return;
+    const dateOf = (idx: number) => `${y}-${String(m).padStart(2, '0')}-${String(idx + 1).padStart(2, '0')}`;
+    const empById = new Map(employees.map(e => [e.id, e]));
+    const existingByCell = new Map(shifts.map(s => [`${s.empId}|${s.shiftDate}`, s]));
 
     const isWork = (WORK_CODES as readonly string[]).includes(code);
+    const sc = SHIFT_CODES[code];
+    const deleteIds: number[] = [];
+    const rows: ScheduleImportRow[] = [];
+    let skipped = 0;
+    let unchanged = 0;
 
-    if (isWork) {
-      const sc = SHIFT_CODES[code];
-      if (existing) {
-        updateShift(existing.id, { start: sc.start!, end: sc.end!, code })
-          .then(updated => setShifts(prev => prev.map(s => s.id === existing.id ? updated : s)))
-          .catch(err => toast(shiftErrorMessage(err)));
-      } else {
-        createShift({ empId: id, station: emp.station, dept: emp.dept, shiftDate: dateStr, start: sc.start!, end: sc.end!, role: emp.role, status: 'Planlandı', note: '', code })
-          .then(newShift => setShifts(prev => [...prev, newShift]))
-          .catch(err => toast(shiftErrorMessage(err)));
+    for (const { empId, dayIdx } of cells) {
+      const emp = empById.get(empId);
+      if (!emp) continue;
+      const dateStr = dateOf(dayIdx);
+      // Çalışma aralığı dışındaki hücreler yazılmaz; kaç tanesi atlandı sayılır
+      // ki kullanıcı sessiz bir kayıpla karşılaşmasın.
+      if (!isWithinEmployment(emp.startDate, emp.endDate, dateStr)) { skipped += 1; continue; }
+
+      const existing = existingByCell.get(`${empId}|${dateStr}`);
+      if (code === '-') {
+        if (existing) deleteIds.push(existing.id); else unchanged += 1;
+        continue;
       }
-    } else if (code === 'İ' || code === 'Yİ' || code === 'Üİ' || code === 'İs') {
-      // Off codes stored explicitly as records with no times
-      if (existing) {
-        updateShift(existing.id, { start: '', end: '', code })
-          .then(updated => setShifts(prev => prev.map(s => s.id === existing.id ? updated : s)))
-          .catch(err => toast(shiftErrorMessage(err)));
-      } else {
-        createShift({ empId: id, station: emp.station, dept: emp.dept, shiftDate: dateStr, start: '', end: '', role: emp.role, status: 'Planlandı', note: '', code })
-          .then(newShift => setShifts(prev => [...prev, newShift]))
-          .catch(err => toast(shiftErrorMessage(err)));
-      }
-    } else {
-      // '-' (boş): no record = empty cell, delete shift if exists
-      if (existing) {
-        deleteShift(existing.id)
-          .then(() => setShifts(prev => prev.filter(s => s.id !== existing.id)))
-          .catch(err => toast(shiftErrorMessage(err)));
-      }
+      // Zaten aynı kod olan hücreye tekrar yazma.
+      if (existing && existing.code === code) { unchanged += 1; continue; }
+      rows.push({
+        empId, shiftDate: dateStr, code,
+        start: isWork ? sc.start! : '',
+        end:   isWork ? sc.end!   : '',
+        role: emp.role, station: emp.station, dept: emp.dept,
+        status: 'Planlandı',
+        note: existing?.note ?? '',
+      });
     }
-  }, [activeMonth, employees, shifts]);
+
+    if (!deleteIds.length && !rows.length) {
+      toast(skipped > 0
+        ? `${skipped} hücre çalışma aralığı dışında olduğu için atlandı`
+        : 'Değişiklik yok — hücreler zaten bu kodda');
+      return;
+    }
+
+    gridBusyRef.current = true;
+    setGridBusy(true);
+    try {
+      await applyScheduleImport(deleteIds, rows);
+      await reloadMonths([activeMonth]);
+      const parts = [`${deleteIds.length + rows.length} hücre güncellendi`];
+      if (skipped)   parts.push(`${skipped} hücre çalışma aralığı dışında, atlandı`);
+      if (unchanged) parts.push(`${unchanged} hücre zaten aynıydı`);
+      toast(parts.join(' · '));
+    } catch (err) {
+      console.error('Toplu kod atama başarısız', err);
+      toast(`Hiçbir hücre değişmedi: ${shiftErrorMessage(err)}`);
+    } finally {
+      gridBusyRef.current = false;
+      setGridBusy(false);
+    }
+  }, [activeMonth, employees, shifts, reloadMonths, toast]);
 
   async function handleSetStatus(shiftId: number, status: ShiftStatus) {
     const shift = shifts.find(s => s.id === shiftId);
@@ -356,13 +385,18 @@ export default function App() {
       toast('Seçili tarih personelin çalışma aralığı dışında');
       return;
     }
+    // İstasyon/departman daima personelden alınır. Form bunları salt-okunur
+    // gösteriyor ama kaynak burada da sabitleniyor: vardiyanın şubesi ile
+    // personelin şubesi ayrışırsa kayıt çizelgede bir şubeye, raporlarda
+    // başka bir şubeye sayılıyor.
+    const payload = emp ? { ...form, station: emp.station, dept: emp.dept } : form;
     try {
       if (id !== null) {
-        const updated = await updateShift(id, { ...form, code });
+        const updated = await updateShift(id, { ...payload, code });
         setShifts(prev => prev.map(s => s.id === id ? updated : s));
         toast('Vardiya güncellendi');
       } else {
-        const newShift = await createShift({ ...form, code });
+        const newShift = await createShift({ ...payload, code });
         setShifts(prev => [...prev, newShift]);
         toast('Yeni vardiya eklendi');
       }
@@ -589,7 +623,7 @@ export default function App() {
           dept={dept} setDept={setDept}
           mode={mode} setMode={setMode}
           activeMonth={activeMonth} setActiveMonth={setActiveMonth}
-          codesOf={codesOf} setCode={setCode}
+          codesOf={codesOf} setCodes={setCodes} gridBusy={gridBusy}
           ensureMonths={ensureMonths} isMonthPending={isMonthPending}
           onNewShift={() => { setShiftToEdit(null); setShiftModalOpen(true); }}
           onExport={() => setExportModalOpen(true)}

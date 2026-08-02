@@ -82,6 +82,8 @@ export function ScheduleImportModal({
   const [fileName, setFileName] = useState('');
   const [plan, setPlan] = useState<ScheduleImportPlan | null>(null);
   const [confirmed, setConfirmed] = useState(false);
+  // Yalnızca silme yapan import için ikinci, ayrı onay.
+  const [deleteConfirmed, setDeleteConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   // applying yalnız yazma aşaması için; busy şablon indirme ve önizlemeyi de kapsıyor.
   // Yazma sürerken pencere kapatılamaz, bu yüzden ikisi ayrı tutuluyor.
@@ -124,12 +126,15 @@ export function ScheduleImportModal({
 
   const canUseScope = !!scope.station && !!scope.dept && !!scope.yearMonth && monthReady;
   const needsConfirm = (plan?.existingCount ?? 0) > 0 || (plan?.summary.delete ?? 0) > 0;
-  const canApply = !!plan && plan.canApply && (!needsConfirm || confirmed) && !busy;
+  const needsDeleteConfirm = !!plan?.deleteOnly;
+  const canApply = !!plan && plan.canApply && (!needsConfirm || confirmed)
+    && (!needsDeleteConfirm || deleteConfirmed) && !busy;
 
   function resetImportState() {
     setFileName('');
     setPlan(null);
     setConfirmed(false);
+    setDeleteConfirmed(false);
     setError('');
     setResult(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -396,6 +401,32 @@ export function ScheduleImportModal({
                 />
                 <span>Mevcut vardiyaların güncelleneceğini, boş hücrelerin ve Excel'de olmayan aktif personellerin seçili ay kayıtlarını sileceğini anlıyorum.</span>
               </label>
+            )}
+
+            {/* Yalnızca silme yapan import: yanlış/boş şablon yüklemenin tipik
+                sonucu. Tek onay kutusuyla bir ayın silinmemesi için ikinci ve
+                açık bir onay isteniyor. */}
+            {plan.deleteOnly && plan.canApply && (
+              <div style={{ border: '1px solid var(--absent-bd)', background: 'var(--absent-bg)', borderRadius: 8, padding: 12, display: 'grid', gap: 9 }}>
+                <b style={{ fontSize: 13, color: 'var(--absent-fg)' }}>
+                  Bu işlem yalnızca silme yapacak
+                </b>
+                <span style={{ fontSize: 12.5, color: 'var(--absent-fg)' }}>
+                  {plan.noCodesInSheet
+                    ? `Excel'de tek bir vardiya kodu yok. `
+                    : 'Excel hiçbir yeni ya da değişmiş vardiya içermiyor. '}
+                  Uygulanırsa {plan.summary.delete} kayıt silinecek, hiçbir kayıt eklenmeyecek.
+                </span>
+                <label style={{ display: 'flex', gap: 9, alignItems: 'flex-start', fontSize: 13, color: 'var(--absent-fg)' }}>
+                  <input
+                    type="checkbox"
+                    checked={deleteConfirmed}
+                    onChange={e => setDeleteConfirmed(e.target.checked)}
+                    style={{ marginTop: 2 }}
+                  />
+                  <span>{plan.summary.delete} kaydın silinmesini bilerek istiyorum.</span>
+                </label>
+              </div>
             )}
           </div>
         )}

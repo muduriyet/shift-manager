@@ -55,7 +55,8 @@ interface ScheduleScreenProps {
   activeMonth: string;
   setActiveMonth: (m: string) => void;
   codesOf: (id: number) => ShiftCodeKey[];
-  setCode: (id: number, idx: number, code: ShiftCodeKey) => void;
+  setCodes: (cells: Array<{ empId: number; dayIdx: number }>, code: ShiftCodeKey) => void;
+  gridBusy: boolean;
   ensureMonths: (months: string[]) => void;
   isMonthPending: (yearMonth: string) => boolean;
   onNewShift: () => void;
@@ -69,7 +70,7 @@ export function ScheduleScreen({
   shifts, employees, stationNames, deptNames, deptColors,
   station, setStation, dept, setDept,
   mode, setMode, activeMonth, setActiveMonth,
-  codesOf, setCode, ensureMonths, isMonthPending,
+  codesOf, setCodes, gridBusy, ensureMonths, isMonthPending,
   onNewShift, onExport, onImport, onShiftClick, onCellAdd,
 }: ScheduleScreenProps) {
   // ---- Week navigation ----
@@ -242,7 +243,8 @@ export function ScheduleScreen({
         <MonthlyView
           groups={monthGroups}
           codesOf={codesOf}
-          setCode={setCode}
+          setCodes={setCodes}
+          busy={gridBusy}
           monthDays={monthDays}
           todayMidx={todayMidx}
           monthShort={monthShort}
