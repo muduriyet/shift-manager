@@ -25,7 +25,10 @@ interface ScheduleImportModalProps {
   ensureMonths: (months: string[]) => void;
   isMonthLoaded: (yearMonth: string) => boolean;
   onClose: () => void;
-  onApply: (plan: ScheduleImportPlan) => Promise<ScheduleImportApplyResult>;
+  onApply: (
+    plan: ScheduleImportPlan,
+    onProgress?: (done: number, total: number) => void,
+  ) => Promise<ScheduleImportApplyResult>;
 }
 
 function firstRealValue(current: string, values: string[]): string {
@@ -83,6 +86,10 @@ export function ScheduleImportModal({
   const [plan, setPlan] = useState<ScheduleImportPlan | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
+  // applying yalnız yazma aşaması için; busy şablon indirme ve önizlemeyi de kapsıyor.
+  // Yazma sürerken pencere kapatılamaz, bu yüzden ikisi ayrı tutuluyor.
+  const [applying, setApplying] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [error, setError] = useState('');
   const [result, setResult] = useState<ScheduleImportApplyResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -133,6 +140,9 @@ export function ScheduleImportModal({
   }
 
   function setScopeValue<K extends keyof ScheduleImportScope>(key: K, value: ScheduleImportScope[K]) {
+    // Yazma sürerken kapsam değiştirilemez: resetImportState planı sıfırlar,
+    // oysa döngü hâlâ eski plan üzerinde yazmaya devam ediyor olur.
+    if (applying) return;
     setScope(prev => {
       if (key === 'station') {
         const nextDept = deptNames.find(dp =>
@@ -203,15 +213,19 @@ export function ScheduleImportModal({
   async function handleApply() {
     if (!canApply || !plan) return;
     setBusy(true);
+    setApplying(true);
+    setProgress({ done: 0, total: plan.actions.length });
     setError('');
     try {
-      const applied = await onApply(plan);
+      const applied = await onApply(plan, (done, total) => setProgress({ done, total }));
       setResult(applied);
     } catch (err) {
       console.error('Schedule import failed', err);
       setError('Import işlemi tamamlanamadı.');
     } finally {
       setBusy(false);
+      setApplying(false);
+      setProgress(null);
     }
   }
 
@@ -229,14 +243,20 @@ export function ScheduleImportModal({
       desc="Seçili şube, departman ve ay için vardiya çizelgesini şablon Excel üzerinden yükleyin."
       onClose={onClose}
       width={760}
+      // Yazma sürerken kapatma kapalı: aksi halde kullanıcı pencereyi kapatıp
+      // süreci gözden kaybediyor, işlem arka planda devam ediyor ve sonuç
+      // özeti (kaç kayıt, kaç hata) hiç görünmüyor.
+      dismissible={!applying}
       footer={
         result ? (
           <Button icon="check" onClick={onClose}>Tamam</Button>
         ) : (
           <>
-            <Button variant="outline" onClick={onClose}>Vazgeç</Button>
+            <Button variant="outline" onClick={onClose} disabled={applying}>Vazgeç</Button>
             <Button icon="check" onClick={handleApply} disabled={!canApply}>
-              {busy ? 'İşleniyor...' : 'İçe Aktar'}
+              {progress
+                ? `İçe aktarılıyor… ${progress.done}/${progress.total}`
+                : busy ? 'İşleniyor...' : 'İçe Aktar'}
             </Button>
           </>
         )
@@ -338,7 +358,33 @@ export function ScheduleImportModal({
           {error && <div style={{ color: 'var(--absent-fg)', fontSize: 13 }}>{error}</div>}
         </div>
 
-        {plan && !result && (
+        {/* Yazma aşaması: her vardiya ayrı bir istekle işlendiği için büyük
+            aktarımlar uzun sürebiliyor; kullanıcı nerede olduğunu görmeli. */}
+        {progress && (
+          <div className="col-2" style={{ display: 'grid', gap: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 13 }}>
+              <b>Vardiyalar yazılıyor…</b>
+              <span className="tnum" style={{ color: 'var(--muted-foreground)' }}>
+                {progress.done} / {progress.total}
+              </span>
+            </div>
+            <div style={{ height: 6, borderRadius: 999, background: 'var(--muted)', overflow: 'hidden' }}>
+              <div
+                style={{
+                  height: '100%',
+                  width: `${progress.total ? Math.round((progress.done / progress.total) * 100) : 0}%`,
+                  background: 'var(--primary)',
+                  transition: 'width .15s linear',
+                }}
+              />
+            </div>
+            <span style={{ fontSize: 12.5, color: 'var(--muted-foreground)' }}>
+              İşlem bitene kadar pencereyi kapatmayın.
+            </span>
+          </div>
+        )}
+
+        {plan && !result && !progress && (
           <div className="col-2" style={{ display: 'grid', gap: 14 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10 }}>
               <ResultLine label="Eşleşen" value={plan.matchedRows.length} />

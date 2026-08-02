@@ -10,6 +10,12 @@ interface DialogProps {
   onClose: () => void;
   width?: number;
   style?: CSSProperties;
+  /**
+   * false ise pencere kapatılamaz: X düğmesi, Escape ve arka plana tıklama
+   * devre dışı kalır. Geri alınamayan bir işlem sürerken (ör. import yazarken)
+   * kullanıcının pencereyi kapatıp süreci gözden kaybetmesini önler.
+   */
+  dismissible?: boolean;
 }
 
 // ---- Escape yığını ----
@@ -41,10 +47,12 @@ function popClose(ref: CloseRef) {
   if (closeStack.length === 0) document.removeEventListener('keydown', onDocumentKey);
 }
 
-export function Dialog({ title, desc, children, footer, onClose, width, style }: DialogProps) {
+export function Dialog({ title, desc, children, footer, onClose, width, style, dismissible = true }: DialogProps) {
   // Ref her render'da tazelenir; yığındaki sıra bundan etkilenmez.
+  // dismissible false iken Escape yutulur ama Dialog yığındaki yerini korur,
+  // aksi halde Escape alttaki pencereyi kapatırdı.
   const closeRef = useRef(onClose);
-  closeRef.current = onClose;
+  closeRef.current = dismissible ? onClose : () => {};
 
   useEffect(() => {
     pushClose(closeRef);
@@ -54,13 +62,13 @@ export function Dialog({ title, desc, children, footer, onClose, width, style }:
   return (
     <div
       className="overlay"
-      onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}
+      onMouseDown={e => { if (dismissible && e.target === e.currentTarget) onClose(); }}
     >
       <div
         className="dialog dialog-wrap"
         style={{ ...(width ? { maxWidth: width } : {}), ...style }}
       >
-        <Button variant="ghost" size="sm" className="dialog-close" icon="x" onClick={onClose} />
+        {dismissible && <Button variant="ghost" size="sm" className="dialog-close" icon="x" onClick={onClose} />}
         <div className="dialog-head">
           <h2>{title}</h2>
           {desc && <p>{desc}</p>}

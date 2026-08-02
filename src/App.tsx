@@ -470,7 +470,12 @@ export default function App() {
     }
   }
 
-  async function handleApplyScheduleImport(plan: ScheduleImportPlan): Promise<ScheduleImportApplyResult> {
+  // Aksiyonlar sırayla işleniyor (her biri ayrı bir istek). Büyük import'larda
+  // bu dakikalar sürebildiği için ilerleme dışarı bildiriliyor.
+  async function handleApplyScheduleImport(
+    plan: ScheduleImportPlan,
+    onProgress?: (done: number, total: number) => void,
+  ): Promise<ScheduleImportApplyResult> {
     const result: ScheduleImportApplyResult = {
       created: 0,
       updated: 0,
@@ -482,8 +487,10 @@ export default function App() {
       errors: [],
     };
     let nextShifts = shifts;
+    const total = plan.actions.length;
+    onProgress?.(0, total);
 
-    for (const action of plan.actions) {
+    for (const [index, action] of plan.actions.entries()) {
       try {
         if (action.kind === 'delete') {
           if (!action.existing) continue;
@@ -525,6 +532,7 @@ export default function App() {
         result.failed += 1;
         result.errors.push(`${action.emp.name} · ${action.dateStr}: ${shiftErrorMessage(err)}`);
       }
+      onProgress?.(index + 1, total);
     }
 
     setShifts(nextShifts);
