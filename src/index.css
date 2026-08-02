@@ -126,6 +126,21 @@ input, select, textarea { font-family: inherit; }
 }
 .btn:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 .btn:not(:disabled) { cursor: pointer; }
+
+/* Belirsiz süreli ilerleme: süresi baştan bilinemeyen tek işlemler için. */
+.progress-indet {
+  height: 6px; border-radius: 999px; background: var(--muted);
+  overflow: hidden; position: relative;
+}
+.progress-indet::after {
+  content: ''; position: absolute; inset: 0 auto 0 0; width: 35%;
+  border-radius: 999px; background: var(--primary);
+  animation: progress-indet 1.1s ease-in-out infinite;
+}
+@keyframes progress-indet {
+  0%   { left: -35%; }
+  100% { left: 100%; }
+}
 /* Devre dışı buton tıklanabilir görünmemeli: hover efektleri de kapatılır,
    yoksa üzerine gelince rengi değişip tıklanabilir izlenimi veriyor. */
 .btn:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }

@@ -325,6 +325,59 @@ export async function deleteShift(id: number): Promise<void> {
   if (error) throw error;
 }
 
+// ---- Çizelge import: toplu yazma ----
+
+export interface ScheduleImportRow {
+  empId: number;
+  shiftDate: string;
+  code: ShiftCodeKey;
+  start: string;
+  end: string;
+  role: RoleName;
+  station: StationName;
+  dept: DepartmentName;
+  status: ShiftStatus;
+  note: string;
+}
+
+export interface ScheduleImportDbResult {
+  deleted: number;
+  replaced: number;
+  written: number;
+}
+
+// Tüm import tek RPC çağrısında, tek transaction'da uygulanır. Aksiyon başına
+// istek atan eski yol hem yavaştı hem de yarıda kesilince ayı yarı yazılmış
+// bırakıyordu; burada ya tamamı uygulanır ya hiçbiri.
+export async function applyScheduleImport(
+  deleteIds: number[],
+  rows: ScheduleImportRow[],
+): Promise<ScheduleImportDbResult> {
+  const payload = {
+    delete_ids: deleteIds,
+    rows: rows.map(r => ({
+      emp_id: r.empId,
+      shift_date: r.shiftDate,
+      code: r.code,
+      start_time: r.start,
+      end_time: r.end,
+      role: r.role,
+      station: r.station,
+      dept: r.dept,
+      status: r.status,
+      note: r.note,
+    })),
+  };
+  const { data, error } = await supabase().rpc('apply_schedule_import', { payload });
+  if (error) throw error;
+  const res = (data ?? {}) as Partial<ScheduleImportDbResult>;
+  return {
+    deleted: res.deleted ?? 0,
+    replaced: res.replaced ?? 0,
+    written: res.written ?? 0,
+  };
+}
+
 // ---- Satış: konfigürasyonlar ----
 
 interface SalesConfigRow {

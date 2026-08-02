@@ -25,10 +25,7 @@ interface ScheduleImportModalProps {
   ensureMonths: (months: string[]) => void;
   isMonthLoaded: (yearMonth: string) => boolean;
   onClose: () => void;
-  onApply: (
-    plan: ScheduleImportPlan,
-    onProgress?: (done: number, total: number) => void,
-  ) => Promise<ScheduleImportApplyResult>;
+  onApply: (plan: ScheduleImportPlan) => Promise<ScheduleImportApplyResult>;
 }
 
 function firstRealValue(current: string, values: string[]): string {
@@ -89,7 +86,6 @@ export function ScheduleImportModal({
   // applying yalnız yazma aşaması için; busy şablon indirme ve önizlemeyi de kapsıyor.
   // Yazma sürerken pencere kapatılamaz, bu yüzden ikisi ayrı tutuluyor.
   const [applying, setApplying] = useState(false);
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [error, setError] = useState('');
   const [result, setResult] = useState<ScheduleImportApplyResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -214,10 +210,9 @@ export function ScheduleImportModal({
     if (!canApply || !plan) return;
     setBusy(true);
     setApplying(true);
-    setProgress({ done: 0, total: plan.actions.length });
     setError('');
     try {
-      const applied = await onApply(plan, (done, total) => setProgress({ done, total }));
+      const applied = await onApply(plan);
       setResult(applied);
     } catch (err) {
       console.error('Schedule import failed', err);
@@ -225,7 +220,6 @@ export function ScheduleImportModal({
     } finally {
       setBusy(false);
       setApplying(false);
-      setProgress(null);
     }
   }
 
@@ -254,9 +248,7 @@ export function ScheduleImportModal({
           <>
             <Button variant="outline" onClick={onClose} disabled={applying}>Vazgeç</Button>
             <Button icon="check" onClick={handleApply} disabled={!canApply}>
-              {progress
-                ? `İçe aktarılıyor… ${progress.done}/${progress.total}`
-                : busy ? 'İşleniyor...' : 'İçe Aktar'}
+              {applying ? 'İçe aktarılıyor…' : busy ? 'İşleniyor...' : 'İçe Aktar'}
             </Button>
           </>
         )
@@ -358,33 +350,24 @@ export function ScheduleImportModal({
           {error && <div style={{ color: 'var(--absent-fg)', fontSize: 13 }}>{error}</div>}
         </div>
 
-        {/* Yazma aşaması: her vardiya ayrı bir istekle işlendiği için büyük
-            aktarımlar uzun sürebiliyor; kullanıcı nerede olduğunu görmeli. */}
-        {progress && (
+        {/* Yazma tek transaction'da yapıldığı için sayaç yok: işlem ya tamamen
+            uygulanır ya hiç. Belirsiz süreli bir gösterge daha dürüst. */}
+        {applying && plan && (
           <div className="col-2" style={{ display: 'grid', gap: 8 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 13 }}>
               <b>Vardiyalar yazılıyor…</b>
               <span className="tnum" style={{ color: 'var(--muted-foreground)' }}>
-                {progress.done} / {progress.total}
+                {plan.actions.length} kayıt
               </span>
             </div>
-            <div style={{ height: 6, borderRadius: 999, background: 'var(--muted)', overflow: 'hidden' }}>
-              <div
-                style={{
-                  height: '100%',
-                  width: `${progress.total ? Math.round((progress.done / progress.total) * 100) : 0}%`,
-                  background: 'var(--primary)',
-                  transition: 'width .15s linear',
-                }}
-              />
-            </div>
+            <div className="progress-indet" />
             <span style={{ fontSize: 12.5, color: 'var(--muted-foreground)' }}>
-              İşlem bitene kadar pencereyi kapatmayın.
+              Tek işlemde uygulanıyor — kesinti olursa hiçbir kayıt değişmez.
             </span>
           </div>
         )}
 
-        {plan && !result && !progress && (
+        {plan && !result && !applying && (
           <div className="col-2" style={{ display: 'grid', gap: 14 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10 }}>
               <ResultLine label="Eşleşen" value={plan.matchedRows.length} />

@@ -1,11 +1,12 @@
 import { useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import type { ViewId, ScheduleMode, Employee, Shift, ShiftStatus, ShiftCodeKey, StationName, DepartmentName, RoleName, Station, Department, Role, SalesImportConfig, Task, Profile } from './types';
-import { SHIFT_CODES, WORK_CODES, isWithinEmployment } from './constants';
+import { SHIFT_CODES, WORK_CODES, isWithinEmployment, yearMonthOf } from './constants';
 import { useShiftStore } from './hooks/useShiftStore';
 import {
   fetchEmployees,
   createEmployee, updateEmployee, setEmployeeActive,
   createShift, updateShift, updateShiftStatus, deleteShift,
+  applyScheduleImport, type ScheduleImportRow,
   fetchStations, createStation, deleteStation,
   fetchDepartments, createDepartment, deleteDepartment,
   fetchRoles, createRole, deleteRole,
@@ -139,7 +140,7 @@ export default function App() {
   const [roles,       setRoles]       = useState<Role[]>([]);
   const [employees,   setEmployees]   = useState<Employee[]>([]);
   const shiftStore = useShiftStore();
-  const { shifts, setShifts, ensureMonths, isMonthPending } = shiftStore;
+  const { shifts, setShifts, ensureMonths, reloadMonths, isMonthPending } = shiftStore;
   const [salesConfigs, setSalesConfigs] = useState<SalesImportConfig[]>([]);
   const [tasks,       setTasks]       = useState<Task[]>([]);
   const [profiles,    setProfiles]    = useState<Profile[]>([]);
@@ -470,12 +471,11 @@ export default function App() {
     }
   }
 
-  // Aksiyonlar sırayla işleniyor (her biri ayrı bir istek). Büyük import'larda
-  // bu dakikalar sürebildiği için ilerleme dışarı bildiriliyor.
-  async function handleApplyScheduleImport(
-    plan: ScheduleImportPlan,
-    onProgress?: (done: number, total: number) => void,
-  ): Promise<ScheduleImportApplyResult> {
+  // Tüm import tek RPC çağrısında, tek transaction'da uygulanır.
+  // Önceden aksiyon başına bir istek atılıyordu: 500 kayıtlık bir ay 500 istek
+  // demekti ve kullanıcı pencereyi kapatsa ya da bağlantı düşse ay yarı
+  // yazılmış kalıyordu. Artık ya tamamı uygulanır ya hiçbiri.
+  async function handleApplyScheduleImport(plan: ScheduleImportPlan): Promise<ScheduleImportApplyResult> {
     const result: ScheduleImportApplyResult = {
       created: 0,
       updated: 0,
@@ -486,56 +486,56 @@ export default function App() {
       skippedNames: plan.unmatchedNames,
       errors: [],
     };
-    let nextShifts = shifts;
-    const total = plan.actions.length;
-    onProgress?.(0, total);
 
-    for (const [index, action] of plan.actions.entries()) {
-      try {
-        if (action.kind === 'delete') {
-          if (!action.existing) continue;
-          await deleteShift(action.existing.id);
-          nextShifts = nextShifts.filter(s => s.id !== action.existing!.id);
-          result.deleted += 1;
-        } else if (action.kind === 'create') {
-          const payload = actionPayload(action);
-          const created = await createShift({
-            empId: action.emp.id,
-            station: action.emp.station,
-            dept: action.emp.dept,
-            shiftDate: action.dateStr,
-            start: payload.start,
-            end: payload.end,
-            role: action.emp.role,
-            status: 'Planlandı',
-            note: '',
-            code: payload.code,
-          });
-          nextShifts = [...nextShifts, created];
-          result.created += 1;
-        } else if (action.kind === 'update' && action.existing) {
-          const payload = actionPayload(action);
-          const updated = await updateShift(action.existing.id, {
-            station: action.emp.station,
-            dept: action.emp.dept,
-            role: action.emp.role,
-            start: payload.start,
-            end: payload.end,
-            status: 'Planlandı',
-            code: payload.code,
-          });
-          nextShifts = nextShifts.map(s => s.id === updated.id ? updated : s);
-          result.updated += 1;
-          result.resetToPlanned += 1;
-        }
-      } catch (err) {
-        result.failed += 1;
-        result.errors.push(`${action.emp.name} · ${action.dateStr}: ${shiftErrorMessage(err)}`);
+    const deleteIds: number[] = [];
+    const rows: ScheduleImportRow[] = [];
+    let createCount = 0;
+    let updateCount = 0;
+
+    for (const action of plan.actions) {
+      if (action.kind === 'delete') {
+        if (action.existing) deleteIds.push(action.existing.id);
+      } else if (action.kind === 'create' || action.kind === 'update') {
+        const payload = actionPayload(action);
+        rows.push({
+          empId: action.emp.id,
+          shiftDate: action.dateStr,
+          code: payload.code,
+          start: payload.start,
+          end: payload.end,
+          role: action.emp.role,
+          station: action.emp.station,
+          dept: action.emp.dept,
+          status: 'Planlandı',
+          // Güncellemede mevcut not korunur; yeni kayıtta boş başlar.
+          note: action.existing?.note ?? '',
+        });
+        if (action.kind === 'create') createCount += 1;
+        else updateCount += 1;
       }
-      onProgress?.(index + 1, total);
     }
 
-    setShifts(nextShifts);
+    try {
+      const applied = await applyScheduleImport(deleteIds, rows);
+      result.created = createCount;
+      result.updated = updateCount;
+      result.deleted = applied.deleted;
+      result.resetToPlanned = updateCount;
+    } catch (err) {
+      // Transaction geri alındığı için kısmi yazma yok: hiçbiri uygulanmadı.
+      console.error('Schedule import failed', err);
+      result.failed = plan.actions.length;
+      result.errors.push(`Hiçbir kayıt yazılmadı: ${shiftErrorMessage(err)}`);
+      toast('Import uygulanamadı, hiçbir kayıt değişmedi');
+      return result;
+    }
+
+    // Kayıtlar silinip yeniden oluşturulduğu için id'ler değişti; etkilenen
+    // ayları sunucudan tazele.
+    const touched = new Set<string>();
+    plan.actions.forEach(a => touched.add(yearMonthOf(a.dateStr)));
+    await reloadMonths([...touched]);
+
     toast(`Import tamamlandı: ${result.created} yeni, ${result.updated} güncelleme, ${result.deleted} silme`);
     return result;
   }

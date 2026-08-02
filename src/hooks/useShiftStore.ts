@@ -16,6 +16,12 @@ export interface ShiftStore {
   setShifts: React.Dispatch<React.SetStateAction<Shift[]>>;
   /** Verilen ayları (yoksa) yükler. Zaten yüklü/yükleniyorsa tekrar istek atmaz. */
   ensureMonths: (months: string[]) => Promise<void>;
+  /**
+   * Verilen ayları yüklü olsalar da sunucudan tazeler. Toplu yazmadan sonra
+   * gerekir: import kayıtları silip yeniden oluşturduğu için id'ler değişir,
+   * bellekteki kopya sunucudaki gerçekle uyuşmaz.
+   */
+  reloadMonths: (months: string[]) => Promise<void>;
   /** true ise ay henüz gelmedi — ekran "veri yok" yerine yükleniyor göstermeli. */
   isMonthPending: (yearMonth: string) => boolean;
   /**
@@ -71,6 +77,15 @@ export function useShiftStore(): ShiftStore {
     }));
   }, []);
 
+  const reloadMonths = useCallback(async (months: string[]) => {
+    const targets = Array.from(new Set(months)).filter(Boolean);
+    if (!targets.length) return;
+    // "Yüklendi" işaretini kaldır ki ensureMonths tekrar çeksin.
+    targets.forEach(ym => loadedRef.current.delete(ym));
+    setLoaded(Array.from(loadedRef.current));
+    await ensureMonths(targets);
+  }, [ensureMonths]);
+
   const isMonthPending = useCallback(
     (yearMonth: string) => pending.includes(yearMonth),
     [pending],
@@ -91,7 +106,7 @@ export function useShiftStore(): ShiftStore {
   }, []);
 
   return {
-    shifts, setShifts, ensureMonths, isMonthPending, isMonthLoaded,
+    shifts, setShifts, ensureMonths, reloadMonths, isMonthPending, isMonthLoaded,
     anyPending: pending.length > 0, loadError, reset,
   };
 }
