@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
-import type { ViewId, ScheduleMode, Employee, Shift, ShiftStatus, ShiftCodeKey, StationName, DepartmentName, RoleName, Station, Department, Role, SalesImportConfig, Task, Profile } from './types';
+import type { ViewId, Employee, Shift, ShiftStatus, ShiftCodeKey, StationName, DepartmentName, RoleName, Station, Department, Role, SalesImportConfig, Task, Profile } from './types';
 import { SHIFT_CODES, WORK_CODES, isWithinEmployment, yearMonthOf } from './constants';
 import { useShiftStore } from './hooks/useShiftStore';
 import {
@@ -67,16 +67,10 @@ interface EmployeeFormData {
 }
 
 const DEFAULT_VIEW: ViewId = 'cizelge';
-const DEFAULT_SCHEDULE_MODE: ScheduleMode = 'ay';
 const VIEW_IDS: readonly ViewId[] = ['cizelge', 'personeller', 'gunluk', 'gorev', 'raporlar', 'ayarlar', 'satis'];
-const SCHEDULE_MODES: readonly ScheduleMode[] = ['hafta', 'ay'];
 
 function isViewId(value: string | null): value is ViewId {
   return value !== null && (VIEW_IDS as readonly string[]).includes(value);
-}
-
-function isScheduleMode(value: string | null): value is ScheduleMode {
-  return value !== null && (SCHEDULE_MODES as readonly string[]).includes(value);
 }
 
 function readStoredView(): ViewId {
@@ -84,13 +78,6 @@ function readStoredView(): ViewId {
   if (isViewId(stored)) return stored;
   if (stored !== null) localStorage.removeItem('vy_view');
   return DEFAULT_VIEW;
-}
-
-function readStoredScheduleMode(): ScheduleMode {
-  const stored = localStorage.getItem('vy_mode');
-  if (isScheduleMode(stored)) return stored;
-  if (stored !== null) localStorage.removeItem('vy_mode');
-  return DEFAULT_SCHEDULE_MODE;
 }
 
 function todayYearMonth(): string {
@@ -132,7 +119,6 @@ function loadErrorMessage(err: unknown): string {
 
 export default function App() {
   const [view,        setView]        = useState<ViewId>(readStoredView);
-  const [mode,        setMode]        = useState<ScheduleMode>(readStoredScheduleMode);
   const [station,     setStation]     = useState('Tümü');
   const [dept,        setDept]        = useState('Tümü');
   const [stations,    setStations]    = useState<Station[]>([]);
@@ -163,7 +149,6 @@ export default function App() {
   const [gridBusy, setGridBusy] = useState(false);
 
   useEffect(() => { localStorage.setItem('vy_view', view); }, [view]);
-  useEffect(() => { localStorage.setItem('vy_mode', mode); }, [mode]);
   useEffect(() => { setDrawer(false); }, [view]);
 
   // Oturum kapısı: açılışta mevcut oturumu oku, sonra login/logout/token değişimlerini dinle.
@@ -625,15 +610,15 @@ export default function App() {
           deptColors={deptColors}
           station={station} setStation={setStation}
           dept={dept} setDept={setDept}
-          mode={mode} setMode={setMode}
           activeMonth={activeMonth} setActiveMonth={setActiveMonth}
           codesOf={codesOf} setCodes={setCodes} gridBusy={gridBusy}
           ensureMonths={ensureMonths} isMonthPending={isMonthPending}
           onNewShift={() => { setShiftToEdit(null); setShiftModalOpen(true); }}
           onExport={() => setExportModalOpen(true)}
           onImport={() => setImportModalOpen(true)}
-          onShiftClick={s => { setShiftToEdit(s); setShiftModalOpen(true); }}
-          onCellAdd={(empId, shiftDate) => {
+          onCellDetail={(empId, shiftDate) => {
+            const existing = shifts.find(s => s.empId === empId && s.shiftDate === shiftDate);
+            if (existing) { setShiftToEdit(existing); setShiftModalOpen(true); return; }
             const emp = employees.find(e => e.id === empId);
             if (!emp) return;
             // Seed (id:0) → modal "Yeni Vardiya Ekle" modunda ama personel + tarih dolu açılır.

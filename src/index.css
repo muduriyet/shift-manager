@@ -516,6 +516,14 @@ table.month { border-collapse: separate; border-spacing: 0; min-width: 100%; use
 .mg-code-btn:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); filter: brightness(.95); }
 .mg-code-btn:active { transform: translateY(0); }
 .mg-picker-divider { width: 1px; height: 28px; background: var(--border); margin: 0 2px; align-self: center; }
+.mg-picker-detail {
+  height: 34px; padding: 0 11px; border-radius: 8px; gap: 6px;
+  border: 1px solid var(--border-strong); background: var(--surface);
+  color: var(--foreground); font-size: 13px; font-weight: 500;
+  display: inline-flex; align-items: center; cursor: pointer;
+  transition: background .12s, border-color .12s;
+}
+.mg-picker-detail:hover { background: var(--muted); border-color: var(--primary); }
 .mg-picker-clear { width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--muted-foreground); display: grid; place-items: center; transition: background .12s, color .12s; }
 .mg-picker-clear:hover { background: var(--absent-bg); color: var(--absent-fg); border-color: var(--absent-bd); }
 

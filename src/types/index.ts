@@ -21,7 +21,6 @@ export type ShiftCodeKey = 'S' | 'Ö' | 'G' | 'Öz' | 'İ' | 'Yİ' | 'Üİ' | '�
 export type ShiftStatus = 'Planlandı' | 'Geldi' | 'Gelmedi';
 export type EmployeeStatus = 'Aktif' | 'Pasif';
 export type ViewId = 'cizelge' | 'personeller' | 'gunluk' | 'raporlar' | 'ayarlar' | 'satis' | 'gorev';
-export type ScheduleMode = 'hafta' | 'ay';
 
 export interface ShiftCodeDef {
   key: ShiftCodeKey;

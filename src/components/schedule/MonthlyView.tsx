@@ -54,6 +54,8 @@ interface MonthlyViewProps {
   setCodes: (cells: Array<{ empId: number; dayIdx: number }>, code: ShiftCodeKey) => void;
   /** Yazma sürerken yeni seçim/atama kabul edilmez. */
   busy: boolean;
+  /** Tek hücre seçiliyken vardiya detaylarını (saat, not, durum) düzenlemek için. */
+  onCellDetail: (empId: number, dateStr: string) => void;
   monthDays: MonthDay[];
   todayMidx: number;
   monthShort: string;
@@ -67,7 +69,7 @@ function fmtDate(iso: string): string {
   return `${parseInt(d)} ${MONTH_NAMES_TR[parseInt(m) - 1]} ${y}`;
 }
 
-export function MonthlyView({ groups, codesOf, setCodes, busy, monthDays, todayMidx, monthShort, activeMonth }: MonthlyViewProps) {
+export function MonthlyView({ groups, codesOf, setCodes, busy, monthDays, todayMidx, monthShort, activeMonth, onCellDetail }: MonthlyViewProps) {
   const [sel, setSel] = useState<Selection | null>(null);
   const [picker, setPicker] = useState<PickerPos | null>(null);
   const [warning, setWarning] = useState<{ x: number; y: number; msg: string } | null>(null);
@@ -168,6 +170,19 @@ export function MonthlyView({ groups, codesOf, setCodes, busy, monthDays, todayM
     });
     setSel(null); setPicker(null);
     setCodes(cells, code);
+  }
+
+  // Tek hücre seçiliyken vardiya detay modalını açar. Kod seçici yalnızca kodu
+  // ve şablon saatlerini değiştirir; not, durum ve serbest saatler buradan
+  // düzenlenir.
+  function openDetail() {
+    if (!bounds || busy) return;
+    const emp = flat[bounds.r1];
+    if (!emp) return;
+    const [y, m] = activeMonth.split('-').map(Number);
+    const dateStr = `${y}-${String(m).padStart(2, '0')}-${String(bounds.c1 + 1).padStart(2, '0')}`;
+    setSel(null); setPicker(null);
+    onCellDetail(emp.id, dateStr);
   }
 
   function empDown(emp: Employee, groupLabel: string, e: React.MouseEvent) {
@@ -368,6 +383,15 @@ export function MonthlyView({ groups, codesOf, setCodes, busy, monthDays, todayM
                 </button>
               );
             })}
+            {selCount === 1 && (
+              <>
+                <div className="mg-picker-divider" />
+                <button className="mg-picker-detail" title="Saat, not ve durumu düzenle" onClick={openDetail}>
+                  <Icon name="pencil" size={13} />
+                  Detay
+                </button>
+              </>
+            )}
             <div className="mg-picker-divider" />
             <button className="mg-picker-clear" title="İptal (Esc)" onClick={() => { setSel(null); setPicker(null); }}>
               <Icon name="x" size={14} />
