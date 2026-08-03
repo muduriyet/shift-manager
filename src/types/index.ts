@@ -20,7 +20,7 @@ export type RoleName = string;
 export type ShiftCodeKey = 'S' | 'Ö' | 'G' | 'Öz' | 'İ' | 'Yİ' | 'Üİ' | 'İs' | '-';
 export type ShiftStatus = 'Planlandı' | 'Geldi' | 'Gelmedi';
 export type EmployeeStatus = 'Aktif' | 'Pasif';
-export type ViewId = 'cizelge' | 'personeller' | 'gunluk' | 'raporlar' | 'ayarlar' | 'satis' | 'gorev';
+export type ViewId = 'cizelge' | 'personeller' | 'raporlar' | 'ayarlar' | 'satis' | 'gorev';
 
 export interface ShiftCodeDef {
   key: ShiftCodeKey;

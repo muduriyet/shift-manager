@@ -315,11 +315,6 @@ export async function updateShift(
   return toShift(data as ShiftRow);
 }
 
-export async function updateShiftStatus(id: number, status: ShiftStatus): Promise<void> {
-  const { error } = await supabase().from('shifts').update({ status }).eq('id', id);
-  if (error) throw error;
-}
-
 export async function deleteShift(id: number): Promise<void> {
   const { error } = await supabase().from('shifts').delete().eq('id', id);
   if (error) throw error;

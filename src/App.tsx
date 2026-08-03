@@ -5,7 +5,7 @@ import { useShiftStore } from './hooks/useShiftStore';
 import {
   fetchEmployees,
   createEmployee, updateEmployee, setEmployeeActive,
-  createShift, updateShift, updateShiftStatus,
+  createShift, updateShift,
   applyScheduleImport, type ScheduleImportRow,
   fetchStations, createStation, deleteStation,
   fetchDepartments, createDepartment, deleteDepartment,
@@ -20,7 +20,6 @@ import { LoginScreen } from './components/auth/LoginScreen';
 import { Sidebar, TopbarMobile, ToastStack } from './components/layout/Sidebar';
 import { ScheduleScreen } from './components/schedule/ScheduleScreen';
 import { EmployeesScreen } from './components/employees/EmployeesScreen';
-import { DailyScreen } from './components/daily/DailyScreen';
 import { ReportsScreen } from './components/reports/ReportsScreen';
 import { SettingsScreen } from './components/settings/SettingsScreen';
 import { TaskNotebookScreen } from './components/tasks/TaskNotebookScreen';
@@ -67,7 +66,7 @@ interface EmployeeFormData {
 }
 
 const DEFAULT_VIEW: ViewId = 'cizelge';
-const VIEW_IDS: readonly ViewId[] = ['cizelge', 'personeller', 'gunluk', 'gorev', 'raporlar', 'ayarlar', 'satis'];
+const VIEW_IDS: readonly ViewId[] = ['cizelge', 'personeller', 'gorev', 'raporlar', 'ayarlar', 'satis'];
 
 function isViewId(value: string | null): value is ViewId {
   return value !== null && (VIEW_IDS as readonly string[]).includes(value);
@@ -354,19 +353,6 @@ export default function App() {
     }
   }, [activeMonth, employees, shifts, reloadMonths, toast]);
 
-  async function handleSetStatus(shiftId: number, status: ShiftStatus) {
-    const shift = shifts.find(s => s.id === shiftId);
-    if (!shift || !(WORK_CODES as readonly string[]).includes(shift.code)) return;
-    const prev = shift.status;
-    setShifts(s => s.map(x => x.id === shiftId ? { ...x, status } : x));
-    try {
-      await updateShiftStatus(shiftId, status);
-    } catch {
-      setShifts(s => s.map(x => x.id === shiftId ? { ...x, status: prev } : x));
-      toast('Durum güncellenemedi');
-    }
-  }
-
   async function handleSaveShift(form: ShiftFormData, id: number | null) {
     const code = codeFromTimes(form.start, form.end);
     const emp = employees.find(e => e.id === form.empId);
@@ -642,20 +628,6 @@ export default function App() {
           onEdit={e => { setEmpToEdit(e); setEmpModalOpen(true); }}
           onAdd={() => { setEmpToEdit(null); setEmpModalOpen(true); }}
           onSetActive={handleSetEmployeeActive}
-        />
-      );
-      break;
-    case 'gunluk':
-      screen = (
-        <DailyScreen
-          shifts={shifts}
-          employees={employees}
-          stationNames={stationNames}
-          deptNames={deptNames}
-          station={station} setStation={setStation}
-          dept={dept} setDept={setDept}
-          setStatus={handleSetStatus}
-          ensureMonths={ensureMonths} isMonthPending={isMonthPending}
         />
       );
       break;
