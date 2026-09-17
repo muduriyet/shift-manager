@@ -34,10 +34,13 @@ interface OnboardingModalProps {
 
 // ---- Stepper ----
 function Stepper({
-  stage, tamam, onPick,
+  stage, tamam, saving, onPick,
 }: {
   stage: OnboardingStage;
   tamam: boolean;
+  // Aşama yazımı uçuştayken tıklamalar yutuluyor; buton da devre dışı olmalı
+  // ki kullanıcı "tıkladım ama hiçbir şey olmadı" durumunda kalmasın.
+  saving: boolean;
   onPick: (k: OnboardingStage) => void;
 }) {
   const sahte = { stage } as Onboarding;
@@ -69,10 +72,12 @@ function Stepper({
             <button
               type="button"
               onClick={() => onPick(s.n)}
-              title={`${s.n}. adıma al`}
+              disabled={saving}
+              title={saving ? 'Kaydediliyor…' : `${s.n}. adıma al`}
               style={{
                 width: 52, height: 52, borderRadius: '50%', display: 'grid', placeItems: 'center',
-                position: 'relative', zIndex: 1, cursor: 'pointer', padding: 0, ...daire,
+                position: 'relative', zIndex: 1, padding: 0,
+                cursor: saving ? 'default' : 'pointer', ...daire,
               }}
             >
               <Icon name={s.icon} size={22} />
@@ -219,6 +224,7 @@ export function OnboardingModal({
   onEmployeeSaved, onToast, onClose, onArchive,
 }: OnboardingModalProps) {
   const [stage, setStage] = useState<OnboardingStage>(process.stage);
+  const [stageSaving, setStageSaving] = useState(false);
   const [docs, setDocs] = useState<OnboardingDoc[]>([]);
   const [phone, setPhone] = useState('');
   const [iban, setIban] = useState('');
@@ -270,16 +276,22 @@ export function OnboardingModal({
 
   // İleri ve geri serbest. Aşamayı geri almak evrak işaretlerini SİLMEZ —
   // yanlış aşama seçimi veri kaybettirmemeli.
+  //
+  // Tek uçuş: iki aşama yazımı aynı anda uçuşta olursa sıra dışı tamamlanıp
+  // DB'de UI'ın gösterdiğinden başka bir aşama kalabilir (QA turu 1).
   async function pickStage(k: OnboardingStage) {
-    if (k === stage) return;
+    if (k === stage || stageSaving) return;
     const onceki = stage;
     setStage(k);
+    setStageSaving(true);
     try {
       await setOnboardingStage(process.id, k);
     } catch (err) {
       console.error('Aşama güncellenemedi', err);
       setStage(onceki);
       onToast('Aşama güncellenemedi');
+    } finally {
+      setStageSaving(false);
     }
   }
 
@@ -342,7 +354,7 @@ export function OnboardingModal({
               </div>
             </div>
 
-            <Stepper stage={stage} tamam={tamam} onPick={pickStage} />
+            <Stepper stage={stage} tamam={tamam} saving={stageSaving} onPick={pickStage} />
 
             {loading ? (
               <div style={{ padding: 30, textAlign: 'center', color: 'var(--muted-foreground)', fontSize: 13.5 }}>

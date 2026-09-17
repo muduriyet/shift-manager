@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Employee, Station, Department, Role, Profile, Onboarding } from '../../types';
-import { archiveOnboarding, createOnboardingWithEmployee, fetchEmployee, fetchOnboardings } from '../../lib/db';
+import {
+  archiveOnboarding, archiveOnboardingIfComplete, createOnboardingWithEmployee,
+  fetchEmployee, fetchOnboardings,
+} from '../../lib/db';
 import { activeDocCount, fmtDMY, stageDef, trLower } from '../../lib/onboarding';
 import { OnboardingModal } from '../modals/OnboardingModal';
 import { OnboardingCreateModal, type OnboardingCreateForm } from '../modals/OnboardingCreateModal';
@@ -131,7 +134,11 @@ export function OnboardingScreen({
     setOpenId(null);
     if (id != null && finalStage >= 3) {
       try {
-        await archiveOnboarding(id);
+        // false = aşama 3 olarak yazılamamış; süreç bilerek açık bırakılıyor.
+        // Sessiz kalmasın, yoksa kullanıcı tamamlandı sanıp listede görür.
+        if (!await archiveOnboardingIfComplete(id)) {
+          onToast('Aşama kaydedilmedi, süreç açık kaldı');
+        }
       } catch (err) {
         console.error('Süreç arşivlenemedi', err);
         onToast('Süreç arşivlenemedi');

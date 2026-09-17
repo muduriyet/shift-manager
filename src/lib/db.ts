@@ -1167,7 +1167,24 @@ export async function setOnboardingDocDone(docId: number, done: boolean): Promis
   if (error) throw error;
 }
 
-// Soft delete: tamamlanan (veya iptal edilen) süreç listeden düşer, kayıt kalır.
+// Otomatik arşivleme (modal kapanışı). Koşul UPDATE'in İÇİNDE, çünkü istemcinin
+// aşama değeri iyimser: kullanıcı 3. adıma tıklayıp modalı hemen kapatırsa
+// aşama yazımı 500 dönmüş olsa bile kapanış onu 3 sanar ve süreç listeden
+// düşerdi — UI'dan geri dönüşü olmayan bir kayıp (QA turu 1).
+// .eq('stage', 3) bu yüzden silinmemeli: yazım başarısızsa (veya henüz
+// uçuştaysa) satırın stage'i 3 değildir, 0 satır eşleşir, arşivleme olmaz.
+export async function archiveOnboardingIfComplete(id: number): Promise<boolean> {
+  const { data, error } = await supabase()
+    .from('onboardings')
+    .update({ archived_at: new Date().toISOString() })
+    .eq('id', id).eq('stage', 3).is('archived_at', null)
+    .select('id');
+  if (error) throw error;
+  return (data ?? []).length > 0;
+}
+
+// Elle iptal: koşulsuz, çünkü tamamlanmadan vazgeçilen süreç her aşamada
+// arşivlenebilmeli.
 export async function archiveOnboarding(id: number): Promise<void> {
   const { error } = await supabase()
     .from('onboardings').update({ archived_at: new Date().toISOString() }).eq('id', id);
