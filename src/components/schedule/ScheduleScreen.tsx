@@ -1,18 +1,18 @@
-import { useState } from 'react';
-import type { Shift, Employee, ShiftCodeKey, ScheduleMode, MonthGroup } from '../../types';
+import { useEffect } from 'react';
+import type { Shift, Employee, ShiftCodeKey, MonthGroup } from '../../types';
 import {
   MONTH_NAMES, MONTH_SHORT_NAMES,
   TODAY_DATE, TODAY_DATE_STR, WORK_CODES,
-  getMonday, addDays, buildWeekDays, buildMonthDays, getMonthLabel,
-  isWithinEmployment,
+  buildMonthDays,
+  isWithinEmployment, isEmployedInRange, monthBounds, yearMonthOf,
 } from '../../constants';
+import { ShiftLoading } from '../ui/ShiftLoading';
 import { Stat } from '../ui/Stat';
 import { Button } from '../ui/Button';
 import { DropdownButton } from '../ui/DropdownButton';
 import { Select } from '../ui/Select';
 import { Icon } from '../ui/Icon';
 import { CodeLegend } from './CodeLegend';
-import { WeeklyView } from './WeeklyView';
 import { MonthlyView } from './MonthlyView';
 
 function buildMonthGroups(
@@ -49,34 +49,27 @@ interface ScheduleScreenProps {
   setStation: (s: string) => void;
   dept: string;
   setDept: (d: string) => void;
-  mode: ScheduleMode;
-  setMode: (m: ScheduleMode) => void;
   activeMonth: string;
   setActiveMonth: (m: string) => void;
   codesOf: (id: number) => ShiftCodeKey[];
-  setCode: (id: number, idx: number, code: ShiftCodeKey) => void;
+  setCodes: (cells: Array<{ empId: number; dayIdx: number }>, code: ShiftCodeKey) => void;
+  gridBusy: boolean;
+  ensureMonths: (months: string[]) => void;
+  isMonthPending: (yearMonth: string) => boolean;
   onNewShift: () => void;
   onExport: () => void;
   onImport: () => void;
-  onShiftClick: (s: Shift) => void;
-  onCellAdd: (empId: number, dateStr: string) => void;
+  /** Bir hücrenin vardiya detaylarını (saat, not, durum) düzenlemek için modalı açar. */
+  onCellDetail: (empId: number, dateStr: string) => void;
 }
 
 export function ScheduleScreen({
   shifts, employees, stationNames, deptNames, deptColors,
   station, setStation, dept, setDept,
-  mode, setMode, activeMonth, setActiveMonth,
-  codesOf, setCode, onNewShift, onExport, onImport, onShiftClick, onCellAdd,
+  activeMonth, setActiveMonth,
+  codesOf, setCodes, gridBusy, ensureMonths, isMonthPending,
+  onNewShift, onExport, onImport, onCellDetail,
 }: ScheduleScreenProps) {
-  // ---- Week navigation ----
-  const [weekStart, setWeekStart] = useState<Date>(() => getMonday(TODAY_DATE));
-  const weekDays = buildWeekDays(weekStart);
-  const todayIndex = weekDays.findIndex(d => d.dateStr === TODAY_DATE_STR);
-  const weekLabel = `${weekDays[0].n} – ${weekDays[6].n} ${getMonthLabel(weekStart.getFullYear(), weekStart.getMonth())}`;
-
-  function prevWeek() { setWeekStart(d => addDays(d, -7)); }
-  function nextWeek() { setWeekStart(d => addDays(d, 7)); }
-
   // ---- Month navigation ----
   const [activeYear, activeMonthNum] = activeMonth.split('-').map(Number);
   const monthDays = buildMonthDays(activeYear, activeMonthNum - 1);
@@ -90,6 +83,19 @@ export function ScheduleScreen({
 
   function prevMonth() { setActiveMonth(shiftYearMonth(activeMonth, -1)); }
   function nextMonth() { setActiveMonth(shiftYearMonth(activeMonth, +1)); }
+
+  // ---- Görünen ayın vardiyalarını iste ----
+  // "Bugünkü Vardiya" istatistiği hangi ay görüntülenirse görüntülensin bugünü
+  // saydığı için içinde bulunduğumuz ay da daima yüklü tutulur. Zaten yüklü
+  // aylar için ensureMonths istek açmaz, her renderda çağrılması güvenlidir.
+  const neededKey = Array.from(new Set([activeMonth, yearMonthOf(TODAY_DATE_STR)])).join(',');
+  useEffect(() => {
+    ensureMonths(neededKey.split(','));
+  }, [neededKey, ensureMonths]);
+
+  // Yalnız görüntülenen ay beklenirken tablo gizlenir; bugünün ayı arka planda
+  // gelebilir, çizelgeyi bloklamaz.
+  const rangePending = isMonthPending(activeMonth);
 
   // ---- Filters ----
   const activeEmps = employees.filter(e => e.status === 'Aktif');
@@ -106,27 +112,21 @@ export function ScheduleScreen({
     return emp ? isWithinEmployment(emp.startDate, emp.endDate, s.shiftDate) : true;
   });
 
-  // Stats use today's work shifts only (S, Ö, G)
+  // Çizelge satırları görüntülenen dönemde çalışan personelle sınırlıdır.
+  // Aralığı dönemle kesişmeyen personelin o dönemde girilebilecek tek bir günü
+  // yoktur; satırı açmak tamamı taralı, işlevsiz bir satır demektir.
+  const { start: periodStart, end: periodEnd } = monthBounds(activeMonth);
+  const periodEmps = filtered.filter(e => isEmployedInRange(e.startDate, e.endDate, periodStart, periodEnd));
+
+  // "Bugünkü Vardiya" hangi dönem görüntülenirse görüntülensin bugünü sayar,
+  // bu yüzden dönem kısıtından değil filteredShifts'ten türetilir.
   const todayShifts = filteredShifts.filter(s => s.shiftDate === TODAY_DATE_STR && (WORK_CODES as readonly string[]).includes(s.code));
   const stats = {
-    total: filtered.length,
+    total: periodEmps.length,
     today: todayShifts.length,
   };
 
-  // Weekly view: only shifts in the viewed week
-  const weekShifts = filteredShifts.filter(
-    s => s.shiftDate >= weekDays[0].dateStr && s.shiftDate <= weekDays[6].dateStr
-  );
-
-  const weekGroups: MonthGroup[] = [];
-  stationNames.forEach(st => deptNames.forEach(dp => {
-    if (station !== 'Tümü' && st !== station) return;
-    if (dept !== 'Tümü' && dp !== dept) return;
-    const emps = filtered.filter(e => e.station === st && e.dept === dp);
-    if (emps.length) weekGroups.push({ label: `${st} / ${dp}`, color: deptColors[dp] ?? '#64748b', emps });
-  }));
-
-  const monthGroups = buildMonthGroups(filtered, stationNames, deptNames, deptColors);
+  const monthGroups = buildMonthGroups(periodEmps, stationNames, deptNames, deptColors);
 
   const todayStr = `${TODAY_DATE.getDate()} ${MONTH_SHORT_NAMES[TODAY_DATE.getMonth()]} ${TODAY_DATE.getFullYear()}`;
 
@@ -135,33 +135,17 @@ export function ScheduleScreen({
       <div className="page-head">
         <div>
           <h1 className="page-title">Vardiya Çizelgesi</h1>
-          <p className="page-desc">Haftalık/Aylık personel vardiyalarını istasyon ve departman bazında oluşturun ve takip edin.</p>
+          <p className="page-desc">Aylık personel vardiyalarını istasyon ve departman bazında oluşturun ve takip edin.</p>
         </div>
         <div className="page-actions">
-          <div className="segment">
-            <button className={mode === 'hafta' ? 'on' : ''} onClick={() => setMode('hafta')}>Hafta</button>
-            <button className={mode === 'ay' ? 'on' : ''} onClick={() => setMode('ay')}>Ay</button>
+          <div className="weekpick">
+            <Button variant="ghost" size="sm" icon="chevronLeft" onClick={prevMonth} />
+            <span className="lbl tnum">
+              <Icon name="calendar" size={15} style={{ marginRight: 7, verticalAlign: '-2px', color: 'var(--muted-foreground)' }} />
+              {monthName}
+            </span>
+            <Button variant="ghost" size="sm" icon="chevronRight" onClick={nextMonth} />
           </div>
-          {mode === 'hafta' && (
-            <div className="weekpick">
-              <Button variant="ghost" size="sm" icon="chevronLeft" onClick={prevWeek} />
-              <span className="lbl tnum">
-                <Icon name="calendar" size={15} style={{ marginRight: 7, verticalAlign: '-2px', color: 'var(--muted-foreground)' }} />
-                {weekLabel}
-              </span>
-              <Button variant="ghost" size="sm" icon="chevronRight" onClick={nextWeek} />
-            </div>
-          )}
-          {mode === 'ay' && (
-            <div className="weekpick">
-              <Button variant="ghost" size="sm" icon="chevronLeft" onClick={prevMonth} />
-              <span className="lbl tnum">
-                <Icon name="calendar" size={15} style={{ marginRight: 7, verticalAlign: '-2px', color: 'var(--muted-foreground)' }} />
-                {monthName}
-              </span>
-              <Button variant="ghost" size="sm" icon="chevronRight" onClick={nextMonth} />
-            </div>
-          )}
           <DropdownButton
             label="Excel"
             icon="download"
@@ -202,30 +186,24 @@ export function ScheduleScreen({
           />
         </div>
         <div className="desk-only">
-          <CodeLegend codes={mode === 'ay' ? ['S', 'Ö', 'G', 'Öz', 'İ', 'Yİ', 'Üİ', 'İs'] : ['S', 'Ö', 'G', 'Öz']} />
+          <CodeLegend codes={['S', 'Ö', 'G', 'Öz', 'İ', 'Yİ', 'Üİ', 'İs']} />
         </div>
       </div>
 
-      {mode === 'ay' && (
+      {/* Ay henüz gelmediyse boş çizelge yerine yükleniyor gösterilir; aksi halde
+          "bu ayda vardiya yok" gibi yanlış bir izlenim oluşur. */}
+      {rangePending && <ShiftLoading label={monthName} />}
+      {!rangePending && (
         <MonthlyView
           groups={monthGroups}
           codesOf={codesOf}
-          setCode={setCode}
+          setCodes={setCodes}
+          busy={gridBusy}
           monthDays={monthDays}
           todayMidx={todayMidx}
           monthShort={monthShort}
           activeMonth={activeMonth}
-        />
-      )}
-      {mode === 'hafta' && (
-        <WeeklyView
-          groups={weekGroups}
-          shifts={weekShifts}
-          weekDays={weekDays}
-          todayIndex={todayIndex}
-          onShiftClick={onShiftClick}
-          onNewShift={onNewShift}
-          onAddShift={onCellAdd}
+          onCellDetail={onCellDetail}
         />
       )}
     </div>

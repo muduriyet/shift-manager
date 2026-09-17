@@ -4,13 +4,18 @@ import { Icon } from './Icon';
 interface FieldProps {
   label: string;
   error?: string;
+  /** Etiketin yanında görünen kısa açıklama (ör. alanın neden salt-okunur olduğu). */
+  hint?: string;
   children: ReactNode;
 }
 
-export function Field({ label, error, children }: FieldProps) {
+export function Field({ label, error, hint, children }: FieldProps) {
   return (
     <label className="field">
-      <span className="field-label">{label}</span>
+      <span className="field-label">
+        {label}
+        {hint && <span className="field-hint">{hint}</span>}
+      </span>
       {children}
       {error && (
         <span className="field-error">

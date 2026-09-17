@@ -4,8 +4,6 @@
 
 İki istasyonlu (Ümraniye, Şile) bir akaryakıt şirketi. Her istasyonun iki departmanı var: Akaryakıt ve Market. Toplam ~26 aktif personel dört grup oluşturur.
 
-Vardiya kontrolleri bir gün gecikmeli yapılır — 11 Haziran'ın devam kontrolü 12 Haziran'da gerçekleşir. Bu yüzden Günlük Kontrol ekranı varsayılan olarak dünü gösterir.
-
 ---
 
 ## Auth / Güvenlik
@@ -57,10 +55,9 @@ RLS çekirdek ve satış tablolarında açıktır. Mevcut politika modeli bilin�
 | start_time | text | `HH:MM`, izin kodlarında boş string |
 | end_time | text | `HH:MM`, izin kodlarında boş string |
 | role / station / dept | text | O günkü atamanın tarihsel snapshot'ı (lookup değişse de sabit kalır) |
-| status | text | `Planlandı` \| `Geldi` \| `Gelmedi` (DB check constraint ile sınırlı) |
 | note | text | |
 
-**Kısıtlar:** `unique(emp_id, shift_date)` (tarihli kayıtlar için) bir personel/gün için tek vardiyayı garanti eder; `shifts_status_check` geçersiz status değerini DB'de engeller.
+**Kısıtlar:** `unique(emp_id, shift_date)` (tarihli kayıtlar için) bir personel/gün için tek vardiyayı garanti eder.
 
 ### Satış tabloları
 
@@ -90,11 +87,9 @@ Satış Dashboard ayrı tablolar ve view'lar kullanır; vardiya tablolarını de
 
 ### Çalışma Kodları
 
-`WORK_CODES = ['S', 'Ö', 'G', 'Öz']` — sadece bu kodlar:
-- Devam durumu (`Geldi`/`Gelmedi`) taşır
-- Günlük Kontrol'de listelenir
-- İstatistik kartlarında sayılır
-- `handleSetStatus` tarafından işlenir
+`WORK_CODES = ['S', 'Ö', 'G', 'Öz']` — sadece bu kodlar çalışma sayılır ve
+çizelgedeki "Bugünkü Vardiya" istatistiğinde sayılır. Diğerleri (`İ`, `Yİ`,
+`Üİ`, `İs`) izin/istirahat kodlarıdır.
 
 ### Vardiya Saatleri
 
@@ -112,13 +107,12 @@ Satış Dashboard ayrı tablolar ve view'lar kullanır; vardiya tablolarını de
 İstihdam penceresi tek bir kuraldan türetilir: `isWithinEmployment(startDate, endDate, dateStr)`. `start_date` veya `end_date` doluysa:
 - `setCode` ve ShiftModal: aralık dışı tarihe atama yapılamaz (modal validasyonla reddeder)
 - `MonthlyView`: bloke hücreler çizgili gri arka planla gösterilir, pill içeriği gizlenir
-- Haftalık / Günlük / Raporlar: aralık dışı vardiyalar gizlenir ve sayılmaz
 - Tekli seçim uyarısı: picker yerine kırmızı uyarı kutusu açılır; çoklu seçimde bloke hücreler sessizce atlanır
 - **Personel tarihleri güncellendiğinde aralık dışındaki vardiyalar SİLİNMEZ** — DB'de korunur, görünümlerde `isWithinEmployment` ile gizlenir (geçmiş veri kaybı önlendi)
 
 ### Personel Silme (Soft Delete)
 
-Personel fiziksel olarak silinmez; "Pasife Al" ile `is_active = false` yapılır (DB tarafında `shifts.emp_id on delete restrict` ile geçmiş ayrıca korunur). Pasif personel çizelge/günlük/yeni-vardiya akışlarından çıkar ama geçmiş vardiyaları raporlarda görünür. Personel Listesi'nde Aktif/Pasif/Tümü filtresi vardır (varsayılan: Aktif).
+Personel fiziksel olarak silinmez; "Pasife Al" ile `is_active = false` yapılır (DB tarafında `shifts.emp_id on delete restrict` ile geçmiş ayrıca korunur). Pasif personel çizelge ve yeni-vardiya akışlarından çıkar ama geçmiş vardiyaları DB'de korunur. Personel Listesi'nde Aktif/Pasif/Tümü filtresi vardır (varsayılan: Aktif).
 
 ---
 
@@ -128,17 +122,16 @@ Personel fiziksel olarak silinmez; "Pasife Al" ile `is_active = false` yapılır
 App.tsx
 ├── Auth gate: getCurrentSession / onAuthChange / signOut
 ├── Global state: stations, departments, roles, employees, shifts, salesConfigs
-├── Persisted UI state: view, schedule mode
+├── Persisted UI state: view
 ├── codesOf(empId): shifts'ten aylık kodları türetir
-├── setCode(id, idx, code): aylık grid'den hücre günceller/siler
-├── handleSetStatus(shiftId, status): sadece WORK_CODES için çalışır
+├── setCodes(cells, code): seçili hücrelerin tamamını tek RPC ile yazar
 └── SalesScreen lazy import: satış kodu yalnızca satış sekmesine girilince yüklenir
 
 ScheduleScreen
-├── Haftalık/aylık mod seçimi
+├── Ay gezinmesi (vardiyalar ay ay yüklenir)
 ├── İstasyon/departman filtresi
 ├── Excel dropdown → ScheduleImportModal / ScheduleExportModal
-└── MonthlyView | WeeklyView
+└── MonthlyView
 
 MonthlyView
 ├── Excel tarzı çoklu hücre seçimi (mousedown → drag → mouseup → picker)
@@ -166,12 +159,12 @@ SalesScreen
 Supabase DB
     ↓ getCurrentSession / onAuthChange
 LoginScreen veya App shell
-    ↓ oturum varsa Promise.all(fetchStations, fetchDepartments, fetchRoles, fetchEmployees, fetchShifts, fetchSalesConfigs)
+    ↓ oturum varsa Promise.all(fetchStations, fetchDepartments, fetchRoles, fetchEmployees, fetchSalesConfigs) + aktif ayın vardiyaları
 App.tsx state: stations[], departments[], roles[], employees[], shifts[], salesConfigs[]
     ↓ props
-ScheduleScreen → MonthlyView / WeeklyView
-    ↓ setCode / onShiftClick
-App.tsx → createShift / updateShift / deleteShift → Supabase
+ScheduleScreen → MonthlyView
+    ↓ setCodes / onCellDetail
+App.tsx → applyScheduleImport RPC | createShift / updateShift → Supabase
     ↓ state update
 shifts[] state güncellenir → re-render
 
@@ -181,7 +174,7 @@ applySalesImportPlan → apply_sales_import RPC
     ↓ satış dashboard/view verisi tekrar okunur
 ```
 
-DB yazma işlemleri çoğunlukla iyimser değil — önce DB, sonra state güncellenir; hata `toast` ile gösterilir. (`handleSetStatus` iyimser günceller, hatada geri alır.)
+DB yazma işlemleri iyimser değil — önce DB, sonra state güncellenir; hata `toast` ile gösterilir.
 
 ---
 
@@ -219,7 +212,6 @@ Personel sıra düzeni (`empOrder` MonthlyView'da) sadece oturum süresince tutu
 ## Bilinen Sınırlamalar / Gelecek Adayları
 
 - RLS açık ancak politika modeli geniş: her authenticated kullanıcı tüm verilere erişebilir. Şube/departman bazlı authorization henüz yok.
-- `fetchShifts` açılışta tüm vardiyaları çeker; veri büyüyünce tarih-aralıklı sorguya geçilmesi planlanıyor.
 - Satış dashboard verisi view üzerinden okunur; dashboard sekmesi şu an manuel refresh/yeni sekmeye girişle güncel veriyi alır, realtime yok.
 - Personel satır sırası yalnızca oturum belleğinde; backend'e kaydedilmiyor
 - Şube → Departman iç içe kapsam yapısı (yaklaşım B) planlanıyor ancak henüz uygulanmadı

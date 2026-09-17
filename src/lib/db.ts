@@ -1,7 +1,7 @@
 import { getSupabaseClient } from './supabase';
 import type {
   Employee, Shift, ShiftCodeKey,
-  StationName, DepartmentName, RoleName, ShiftStatus, EmployeeStatus,
+  StationName, DepartmentName, RoleName, EmployeeStatus,
   Station, Department, Role,
   SalesImportConfig, SalesConfigStatus, SalesMapping, SalesDailyReport,
   SalesImportScope, SalesReportValues, SalesImportApplyResult, SalesDailyView,
@@ -10,6 +10,25 @@ import type {
 } from '../types';
 
 const supabase = () => getSupabaseClient();
+
+// PostgREST tek istekte en fazla 1000 satır döndürür (db-max-rows). Satır sayısı
+// bunu aşan tablolarda sessizce kırpılma olur; bu yüzden büyüyen tabloları
+// .range() ile sayfa sayfa çekiyoruz.
+const PAGE_SIZE = 1000;
+
+async function fetchAllRows<T>(
+  build: () => { range: (from: number, to: number) => PromiseLike<{ data: unknown; error: unknown }> },
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await build().range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    const page = (data ?? []) as T[];
+    rows.push(...page);
+    if (page.length < PAGE_SIZE) break;
+  }
+  return rows;
+}
 
 // ---- Stations & Departments ----
 
@@ -108,7 +127,6 @@ interface ShiftRow {
   role: string;
   station: string;
   dept: string;
-  status: string;
   note: string;
 }
 
@@ -145,7 +163,6 @@ function toShift(r: ShiftRow): Shift {
     role: r.role as RoleName,
     station: r.station as StationName,
     dept: r.dept as DepartmentName,
-    status: r.status as ShiftStatus,
     note: r.note,
   };
 }
@@ -218,10 +235,19 @@ export async function setEmployeeActive(id: number, active: boolean): Promise<Em
 
 // ---- Shifts ----
 
-export async function fetchShifts(): Promise<Shift[]> {
-  const { data, error } = await supabase().from('shifts').select('*').order('id');
-  if (error) throw error;
-  return (data as ShiftRow[]).map(toShift);
+// Tüm çizelge ekranları tarih aralığıyla çalıştığı için vardiyalar aralık aralık
+// çekilir; tablonun tamamı hiçbir zaman belleğe alınmaz. Aralık büyük olsa bile
+// fetchAllRows sayfalama yaptığından 1000 satır limiti sorun olmaz.
+export async function fetchShiftsInRange(fromDate: string, toDate: string): Promise<Shift[]> {
+  const rows = await fetchAllRows<ShiftRow>(
+    () => supabase()
+      .from('shifts')
+      .select('*')
+      .gte('shift_date', fromDate)
+      .lte('shift_date', toDate)
+      .order('id'),
+  );
+  return rows.map(toShift);
 }
 
 export async function createShift(form: {
@@ -232,7 +258,6 @@ export async function createShift(form: {
   start: string;
   end: string;
   role: RoleName;
-  status: ShiftStatus;
   note: string;
   code?: ShiftCodeKey;
 }): Promise<Shift> {
@@ -249,7 +274,6 @@ export async function createShift(form: {
       role: form.role,
       station: form.station,
       dept: form.dept,
-      status: form.status,
       note: form.note,
     })
     .select()
@@ -263,7 +287,7 @@ export async function updateShift(
   form: {
     empId?: number; station?: StationName; dept?: DepartmentName;
     shiftDate?: string; start?: string; end?: string;
-    role?: RoleName; status?: ShiftStatus; note?: string;
+    role?: RoleName; note?: string;
     code?: ShiftCodeKey;
   },
 ): Promise<Shift> {
@@ -278,7 +302,6 @@ export async function updateShift(
   if (form.start  !== undefined) patch.start_time = form.start;
   if (form.end    !== undefined) patch.end_time   = form.end;
   if (form.role   !== undefined) patch.role       = form.role;
-  if (form.status !== undefined) patch.status     = form.status;
   if (form.note   !== undefined) patch.note       = form.note;
   if (form.code   !== undefined) patch.code       = form.code;
 
@@ -288,14 +311,60 @@ export async function updateShift(
   return toShift(data as ShiftRow);
 }
 
-export async function updateShiftStatus(id: number, status: ShiftStatus): Promise<void> {
-  const { error } = await supabase().from('shifts').update({ status }).eq('id', id);
-  if (error) throw error;
-}
-
 export async function deleteShift(id: number): Promise<void> {
   const { error } = await supabase().from('shifts').delete().eq('id', id);
   if (error) throw error;
+}
+
+// ---- Çizelge import: toplu yazma ----
+
+export interface ScheduleImportRow {
+  empId: number;
+  shiftDate: string;
+  code: ShiftCodeKey;
+  start: string;
+  end: string;
+  role: RoleName;
+  station: StationName;
+  dept: DepartmentName;
+  note: string;
+}
+
+export interface ScheduleImportDbResult {
+  deleted: number;
+  replaced: number;
+  written: number;
+}
+
+// Tüm import tek RPC çağrısında, tek transaction'da uygulanır. Aksiyon başına
+// istek atan eski yol hem yavaştı hem de yarıda kesilince ayı yarı yazılmış
+// bırakıyordu; burada ya tamamı uygulanır ya hiçbiri.
+export async function applyScheduleImport(
+  deleteIds: number[],
+  rows: ScheduleImportRow[],
+): Promise<ScheduleImportDbResult> {
+  const payload = {
+    delete_ids: deleteIds,
+    rows: rows.map(r => ({
+      emp_id: r.empId,
+      shift_date: r.shiftDate,
+      code: r.code,
+      start_time: r.start,
+      end_time: r.end,
+      role: r.role,
+      station: r.station,
+      dept: r.dept,
+      note: r.note,
+    })),
+  };
+  const { data, error } = await supabase().rpc('apply_schedule_import', { payload });
+  if (error) throw error;
+  const res = (data ?? {}) as Partial<ScheduleImportDbResult>;
+  return {
+    deleted: res.deleted ?? 0,
+    replaced: res.replaced ?? 0,
+    written: res.written ?? 0,
+  };
 }
 
 // ---- Satış: konfigürasyonlar ----
@@ -469,12 +538,10 @@ export async function fetchSalesReportForScope(
 }
 
 export async function fetchSalesReports(): Promise<SalesDailyReport[]> {
-  const { data, error } = await supabase()
-    .from('sales_daily_reports')
-    .select('*')
-    .order('report_date');
-  if (error) throw error;
-  return (data as SalesReportRow[]).map(toSalesReport);
+  const rows = await fetchAllRows<SalesReportRow>(
+    () => supabase().from('sales_daily_reports').select('*').order('report_date').order('id'),
+  );
+  return rows.map(toSalesReport);
 }
 
 // ---- Satış: dashboard view ----
@@ -510,12 +577,10 @@ function toDailyView(r: SalesDailyViewRow): SalesDailyView {
 }
 
 export async function fetchSalesDashboardDaily(): Promise<SalesDailyView[]> {
-  const { data, error } = await supabase()
-    .from('sales_dashboard_daily_view')
-    .select('*')
-    .order('report_date');
-  if (error) throw error;
-  return (data as SalesDailyViewRow[]).map(toDailyView);
+  const rows = await fetchAllRows<SalesDailyViewRow>(
+    () => supabase().from('sales_dashboard_daily_view').select('*').order('report_date').order('id'),
+  );
+  return rows.map(toDailyView);
 }
 
 // Veri Gezgini "Ham Tablo" inline düzenlemesi → temel tabloya (view değil) id ile yazar.
@@ -701,13 +766,10 @@ function nextDueDate(base: Date, kind: RepeatKind, n: number, unit: RepeatUnit):
 }
 
 export async function fetchTasks(): Promise<Task[]> {
-  const { data, error } = await supabase()
-    .from('tasks')
-    .select('*')
-    .is('archived_at', null)
-    .order('id');
-  if (error) throw error;
-  return (data as TaskRow[]).map(toTask);
+  const rows = await fetchAllRows<TaskRow>(
+    () => supabase().from('tasks').select('*').is('archived_at', null).order('id'),
+  );
+  return rows.map(toTask);
 }
 
 export async function createTask(form: TaskForm, createdBy: string | null): Promise<Task> {

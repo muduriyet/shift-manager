@@ -1,12 +1,20 @@
 import type { Employee, Shift, ShiftCodeKey } from '../types';
-import { SHIFT_CODES, buildMonthDays, dateToStr, isWithinEmployment } from '../constants';
+import { SHIFT_CODES, buildMonthDays, dateToStr, isWithinEmployment, isEmployedInRange, monthBounds } from '../constants';
 
+// Aşağıdaki sabitler şablonu YAZARKEN kullanılan düzendir. Okuma tarafı bunlara
+// bağlı değildir: dosyanın düzeni detectLayout ile tespit edilir; böylece şablon
+// düzeni değişse ya da kullanıcı başa kolon/satır eklese bile import çalışır.
 const NAME_COL = 1;      // B
 const FIRST_DAY_COL = 3; // D
 const DAY_NAME_ROW = 0;  // 1
 const DAY_NUM_ROW = 1;   // 2
 const FIRST_EMP_ROW = 3; // 4
 const DAY_SHORTS = ['PT', 'S', 'Ç', 'P', 'C', 'CT', 'P'];
+
+// Gün numarası satırını tanımak için aranan asgari ardışık gün sayısı (1,2,3…).
+const MIN_DAY_RUN = 5;
+// Başlık/düzen araması yalnızca dosyanın başında yapılır.
+const LAYOUT_SCAN_ROWS = 25;
 
 type ImportCode = Exclude<ShiftCodeKey, 'Öz' | '-'>;
 // 'Öz' parse aşamasında geçerlidir ama oluşturulamaz (saatleri Excel temsil edemez);
@@ -37,7 +45,6 @@ export interface ScheduleImportAction {
   dateStr: string;
   existing?: Shift;
   code?: ImportCode;
-  statusPreserved?: boolean;
 }
 
 export interface ScheduleImportPlan {
@@ -53,8 +60,15 @@ export interface ScheduleImportPlan {
   formatErrors: string[];
   warnings: string[];
   existingCount: number;
-  statusPreservedCount: number;
-  resetStatusCount: number;
+  /** Excel'deki kod mevcut kayıtla aynı olan hücre sayısı (aksiyon üretilmez). */
+  unchangedCellCount: number;
+  /**
+   * Import hiçbir kayıt oluşturmuyor/güncellemiyor, yalnızca siliyor. Yanlışlıkla
+   * boş bir şablon yüklemenin tipik sonucu budur, o yüzden ayrı bir onay ister.
+   */
+  deleteOnly: boolean;
+  /** Excel'de tek bir vardiya kodu bile yok (tüm eşleşen satırlar boş). */
+  noCodesInSheet: boolean;
   summary: {
     create: number;
     update: number;
@@ -69,8 +83,7 @@ export interface ScheduleImportApplyResult {
   updated: number;
   deleted: number;
   failed: number;
-  statusPreserved: number;
-  resetToPlanned: number;
+  unchangedCells: number;
   skippedNames: string[];
   errors: string[];
 }
@@ -117,6 +130,62 @@ function colName(index: number): string {
   return out;
 }
 
+// Okunan sayfanın düzeni. Sabit kolon/satır varsaymak yerine dosyadan tespit
+// edilir; kullanıcının başa kolon eklemesi ya da Excel'in boş kolonları
+// dimension'dan düşürmesi import'u bozmaz.
+interface SheetLayout {
+  dayNumRow: number;
+  firstDayCol: number;
+  nameCol: number;
+  firstEmpRow: number;
+}
+
+// Gün numarası satırı: içinde 1,2,3… diye ardışık giden bir dizi bulunan satır.
+// Dönen firstDayCol, "1"in bulunduğu kolondur.
+function findDayNumberRow(rows: unknown[][]): { row: number; col: number } | null {
+  const scanTo = Math.min(rows.length, LAYOUT_SCAN_ROWS);
+  for (let r = 0; r < scanTo; r += 1) {
+    const row = rows[r];
+    if (!row) continue;
+    for (let c = 0; c < row.length; c += 1) {
+      if (cellText(row[c]) !== '1') continue;
+      let run = 1;
+      while (cellText(row[c + run]) === String(run + 1)) run += 1;
+      if (run >= MIN_DAY_RUN) return { row: r, col: c };
+    }
+  }
+  return null;
+}
+
+// İsim kolonu: gün kolonlarının solunda kalan, altındaki satırlarda en çok metin
+// içeren kolon. Şablonda A ve C boş, B isimli olduğu için B seçilir.
+function findNameColumn(rows: unknown[][], dayNumRow: number, firstDayCol: number): number | null {
+  let bestCol = -1;
+  let bestCount = 0;
+  for (let c = 0; c < firstDayCol; c += 1) {
+    let count = 0;
+    for (let r = dayNumRow + 1; r < rows.length; r += 1) {
+      if (cellText(rows[r]?.[c])) count += 1;
+    }
+    // Eşitlikte gün kolonlarına en yakın olan kazanır (isim sütunu genelde bitişiktir).
+    if (count > 0 && count >= bestCount) { bestCount = count; bestCol = c; }
+  }
+  return bestCol >= 0 ? bestCol : null;
+}
+
+function detectLayout(rows: unknown[][]): SheetLayout | null {
+  const day = findDayNumberRow(rows);
+  if (!day) return null;
+  const nameCol = findNameColumn(rows, day.row, day.col);
+  if (nameCol === null) return null;
+  let firstEmpRow = -1;
+  for (let r = day.row + 1; r < rows.length; r += 1) {
+    if (cellText(rows[r]?.[nameCol])) { firstEmpRow = r; break; }
+  }
+  if (firstEmpRow < 0) return null;
+  return { dayNumRow: day.row, firstDayCol: day.col, nameCol, firstEmpRow };
+}
+
 function normalizeCode(value: unknown): ParsedCode | null | 'INVALID' {
   const text = cellText(value);
   if (!text) return null;
@@ -136,10 +205,14 @@ function shiftStartEnd(code: ImportCode): { start: string; end: string } {
 }
 
 function scopedEmployees(employees: Employee[], scope: ScheduleImportScope): Employee[] {
+  // Şablon ve import planı, çizelgeyle aynı personel kümesi üzerinden çalışır:
+  // aralığı seçili ayla kesişmeyen personel her iki tarafta da yer almaz.
+  const { start, end } = monthBounds(scope.yearMonth);
   return employees.filter(e =>
     e.status === 'Aktif' &&
     e.station === scope.station &&
-    e.dept === scope.dept,
+    e.dept === scope.dept &&
+    isEmployedInRange(e.startDate, e.endDate, start, end),
   );
 }
 
@@ -204,6 +277,24 @@ export async function downloadScheduleTemplate(options: {
   );
 }
 
+// sheet_to_json satır dizilerini !ref'in BAŞLANGIÇ KOLONUNA göre indeksler,
+// A kolonuna göre değil. Şablonun A kolonu tamamen boş olduğu için (isimler B,
+// günler D'den başlar) Excel dosyayı kaydederken boş kolonu dimension'dan
+// düşürür ve !ref B1'e kayar; o andan itibaren tüm diziler bir kolon sola
+// kayarak okunur — isim kolonu boş görünür, 1. gün yerine 2. gün okunur.
+// Aralığı A1'den başlamaya zorlayarak indeksleri mutlak hale getiriyoruz.
+function sheetToAbsoluteRows(
+  XLSX: typeof import('xlsx'),
+  sheet: import('xlsx').WorkSheet,
+): unknown[][] {
+  const ref = sheet['!ref'];
+  if (!ref) return [];
+  const range = XLSX.utils.decode_range(ref);
+  range.s.c = 0;
+  range.s.r = 0;
+  return XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null, raw: false, range });
+}
+
 export async function buildScheduleImportPlan(options: {
   file: File;
   employees: Employee[];
@@ -215,9 +306,7 @@ export async function buildScheduleImportPlan(options: {
   const workbook = XLSX.read(bytes, { type: 'array' });
   const firstSheetName = workbook.SheetNames[0];
   const sheet = firstSheetName ? workbook.Sheets[firstSheetName] : null;
-  const rows = sheet
-    ? XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null, raw: false })
-    : [];
+  const rows = sheet ? sheetToAbsoluteRows(XLSX, sheet) : [];
 
   return buildPlanFromRows(rows, options);
 }
@@ -242,44 +331,60 @@ function buildPlanFromRows(
     formatErrors.push('Excel dosyasında okunabilir sayfa bulunamadı.');
   }
 
-  for (let dayIdx = 0; dayIdx < days.length; dayIdx += 1) {
-    const expected = String(dayIdx + 1);
-    const actual = cellText(rows[DAY_NUM_ROW]?.[FIRST_DAY_COL + dayIdx]);
-    if (actual !== expected) {
-      formatErrors.push(`${colName(FIRST_DAY_COL + dayIdx)}2 hücresinde ${expected} bekleniyordu, ${actual || 'boş'} bulundu.`);
-      break;
-    }
+  // Kolon/satır konumları dosyadan tespit edilir, sabit varsayılmaz.
+  const layout = rows.length ? detectLayout(rows) : null;
+
+  if (rows.length && !layout) {
+    formatErrors.push(
+      'Çizelge düzeni tanınamadı: gün numaralarının (1, 2, 3…) bulunduğu satır ' +
+      've solunda personel isimlerinin olduğu kolon bulunamadı. Şablonu indirip ' +
+      'gün başlıklarını ve isim kolonunu koruyarak doldurun.',
+    );
   }
 
-  const extraDay = cellText(rows[DAY_NUM_ROW]?.[FIRST_DAY_COL + days.length]);
-  if (extraDay) {
-    warnings.push(`Seçili ay ${days.length} gün; ${colName(FIRST_DAY_COL + days.length)}2 ve sonrası yok sayılacak.`);
-  }
+  if (layout) {
+    const { dayNumRow, firstDayCol, nameCol, firstEmpRow } = layout;
+    const dayRowLabel = dayNumRow + 1;
 
-  for (let rowIdx = FIRST_EMP_ROW; rowIdx < rows.length; rowIdx += 1) {
-    const excelName = cellText(rows[rowIdx]?.[NAME_COL]);
-    if (!excelName) continue;
-    const codes: Array<ParsedCode | null> = [];
     for (let dayIdx = 0; dayIdx < days.length; dayIdx += 1) {
-      const raw = rows[rowIdx]?.[FIRST_DAY_COL + dayIdx];
-      const code = normalizeCode(raw);
-      if (code === 'INVALID') {
-        invalidCodes.push({
-          row: rowIdx + 1,
-          col: FIRST_DAY_COL + dayIdx + 1,
-          cell: `${colName(FIRST_DAY_COL + dayIdx)}${rowIdx + 1}`,
-          value: cellText(raw),
-        });
-        codes.push(null);
-      } else {
-        codes.push(code);
+      const expected = String(dayIdx + 1);
+      const actual = cellText(rows[dayNumRow]?.[firstDayCol + dayIdx]);
+      if (actual !== expected) {
+        formatErrors.push(`${colName(firstDayCol + dayIdx)}${dayRowLabel} hücresinde ${expected} bekleniyordu, ${actual || 'boş'} bulundu.`);
+        break;
       }
     }
-    parsedRows.push({ excelName, normalizedName: normalizeScheduleName(excelName), codes });
-  }
 
-  if (!parsedRows.length) {
-    formatErrors.push('B4 kolonundan başlayan personel isimleri bulunamadı.');
+    const extraDay = cellText(rows[dayNumRow]?.[firstDayCol + days.length]);
+    if (extraDay) {
+      warnings.push(`Seçili ay ${days.length} gün; ${colName(firstDayCol + days.length)}${dayRowLabel} ve sonrası yok sayılacak.`);
+    }
+
+    for (let rowIdx = firstEmpRow; rowIdx < rows.length; rowIdx += 1) {
+      const excelName = cellText(rows[rowIdx]?.[nameCol]);
+      if (!excelName) continue;
+      const codes: Array<ParsedCode | null> = [];
+      for (let dayIdx = 0; dayIdx < days.length; dayIdx += 1) {
+        const raw = rows[rowIdx]?.[firstDayCol + dayIdx];
+        const code = normalizeCode(raw);
+        if (code === 'INVALID') {
+          invalidCodes.push({
+            row: rowIdx + 1,
+            col: firstDayCol + dayIdx + 1,
+            cell: `${colName(firstDayCol + dayIdx)}${rowIdx + 1}`,
+            value: cellText(raw),
+          });
+          codes.push(null);
+        } else {
+          codes.push(code);
+        }
+      }
+      parsedRows.push({ excelName, normalizedName: normalizeScheduleName(excelName), codes });
+    }
+
+    if (!parsedRows.length) {
+      formatErrors.push(`${colName(nameCol)}${firstEmpRow + 1} kolonundan başlayan personel isimleri bulunamadı.`);
+    }
   }
 
   const excelNameMap = new Map<string, string[]>();
@@ -319,11 +424,17 @@ function buildPlanFromRows(
   const existingShifts = scopedMonthShifts(shifts, employees, scope);
   const existingByCell = new Map(existingShifts.map(s => [shiftKey(s.empId, s.shiftDate), s]));
   const actions: ScheduleImportAction[] = [];
-  let statusPreservedCount = 0;
-  let resetStatusCount = 0;
+  let unchangedCellCount = 0;
   let ozPreservedCount = 0;
 
+  // Dosya hiç okunamadıysa ya da düzeni tanınmadıysa aksiyon üretilmez.
+  // Aksi halde "hiç kod okunamadı" durumu "her hücre boş" gibi yorumlanıp
+  // ayın tamamı için silme planı çıkıyor ve özet ekranında "Silinecek 505"
+  // gibi yanıltıcı bir rakam görünüyordu.
+  const layoutUsable = formatErrors.length === 0;
+
   people.forEach(emp => {
+    if (!layoutUsable) return;
     const desiredRow = desiredByEmployee.get(emp.id);
     days.forEach((dateStr, dayIdx) => {
       if (!isWithinEmployment(emp.startDate, emp.endDate, dateStr)) return;
@@ -347,11 +458,10 @@ function buildPlanFromRows(
       }
 
       if (existing.code === desiredCode) {
-        statusPreservedCount += 1;
+        unchangedCellCount += 1;
         return;
       }
 
-      resetStatusCount += 1;
       actions.push({ kind: 'update', emp, dateStr, existing, code: desiredCode });
     });
   });
@@ -373,6 +483,15 @@ function buildPlanFromRows(
     duplicateScheduleNames.length === 0 &&
     emptyScheduleNameEmployees.length === 0;
 
+  const deleteOnly = summary.create === 0 && summary.update === 0 && summary.delete > 0;
+  const noCodesInSheet = parsedRows.length > 0 && parsedRows.every(r => r.codes.every(c => !c));
+  if (noCodesInSheet && summary.delete > 0) {
+    warnings.push(
+      `Excel'de hiç vardiya kodu yok. Uygulanırsa seçili ayın ${summary.delete} kaydı silinir — ` +
+      'yanlış ya da boş bir şablon yüklemiş olabilirsiniz.',
+    );
+  }
+
   return {
     scope,
     days,
@@ -386,8 +505,9 @@ function buildPlanFromRows(
     formatErrors,
     warnings,
     existingCount: existingShifts.length,
-    statusPreservedCount,
-    resetStatusCount,
+    unchangedCellCount,
+    deleteOnly,
+    noCodesInSheet,
     summary,
     canApply,
   };

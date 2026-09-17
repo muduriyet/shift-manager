@@ -17,11 +17,13 @@ interface SelectProps {
   className?: string;
   small?: boolean;
   error?: boolean;
+  /** Salt-okunur: menü açılmaz, değer değiştirilemez. */
+  disabled?: boolean;
 }
 
 export function Select({
   value, onChange, options, placeholder = 'Seçiniz',
-  icon, className = '', small, error,
+  icon, className = '', small, error, disabled,
 }: SelectProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -46,13 +48,16 @@ export function Select({
     error ? 'is-error' : '',
   ].filter(Boolean).join(' ');
 
+  const isOpen = open && !disabled;
+
   return (
     <div className={`select ${className}`} ref={ref}>
       <button
         type="button"
         className={triggerCls}
         style={small ? { height: 32 } : undefined}
-        onClick={() => setOpen(o => !o)}
+        disabled={disabled}
+        onClick={() => { if (!disabled) setOpen(o => !o); }}
       >
         <span style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {icon && <Icon name={icon} size={15} />}
@@ -60,7 +65,7 @@ export function Select({
         </span>
         <Icon name="chevronDown" size={16} />
       </button>
-      {open && (
+      {isOpen && (
         <div className="select-menu">
           {opts.map(o => (
             <div

@@ -18,10 +18,8 @@ export interface Role {
 }
 export type RoleName = string;
 export type ShiftCodeKey = 'S' | 'Ö' | 'G' | 'Öz' | 'İ' | 'Yİ' | 'Üİ' | 'İs' | '-';
-export type ShiftStatus = 'Planlandı' | 'Geldi' | 'Gelmedi';
 export type EmployeeStatus = 'Aktif' | 'Pasif';
-export type ViewId = 'cizelge' | 'personeller' | 'gunluk' | 'raporlar' | 'ayarlar' | 'satis' | 'gorev' | 'isegiris';
-export type ScheduleMode = 'hafta' | 'ay';
+export type ViewId = 'cizelge' | 'personeller' | 'ayarlar' | 'satis' | 'gorev' | 'isegiris';
 
 export interface ShiftCodeDef {
   key: ShiftCodeKey;
@@ -65,7 +63,6 @@ export interface Shift {
   role: RoleName;
   station: StationName;
   dept: DepartmentName;
-  status: ShiftStatus;
   note: string;
 }
 
@@ -184,15 +181,6 @@ export interface MonthDay {
   wIdx: number;
   wShort: string;
   wFull: string;
-  weekend: boolean;
-}
-
-export interface WeekDay {
-  key: string;
-  short: string;
-  date: string;    // display label, e.g. "9 Haz"
-  dateStr: string; // YYYY-MM-DD
-  n: number;
   weekend: boolean;
 }
 

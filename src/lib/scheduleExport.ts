@@ -1,5 +1,5 @@
 import type { Employee, Shift, ShiftCodeKey } from '../types';
-import { MONTH_NAMES, buildMonthDays, dateToStr, isWithinEmployment } from '../constants';
+import { MONTH_NAMES, buildMonthDays, dateToStr, isWithinEmployment, isEmployedInRange, monthBounds } from '../constants';
 
 export interface ScheduleExportScope {
   station: string;
@@ -79,10 +79,14 @@ function daysForMonth(yearMonth: string): string[] {
 }
 
 function scopedEmployees(employees: Employee[], scope: ScheduleExportScope): Employee[] {
+  // Çalışma aralığı seçili ayla kesişmeyen personel çizelgede listelenmediği
+  // gibi Excel'e de yazılmaz; aksi halde dosyada tamamı boş satırlar çıkar.
+  const { start, end } = monthBounds(scope.yearMonth);
   return employees.filter(e =>
     e.status === 'Aktif' &&
     e.station === scope.station &&
-    e.dept === scope.dept,
+    e.dept === scope.dept &&
+    isEmployedInRange(e.startDate, e.endDate, start, end),
   );
 }
 

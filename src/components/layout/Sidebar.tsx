@@ -6,10 +6,8 @@ import { Badge } from '../ui/Badge';
 const NAV: NavItem[] = [
   { id: 'cizelge',    label: 'Çizelge',        icon: 'calendar' },
   { id: 'personeller', label: 'Personel Listesi', icon: 'users' },
-  { id: 'gunluk',     label: 'Günlük Kontrol',  icon: 'clipboard' },
   { id: 'gorev',      label: 'Görev Defteri',    icon: 'checkSquare' },
   { id: 'isegiris',   label: 'İşe Giriş Süreçleri', icon: 'userCheck' },
-  { id: 'raporlar',   label: 'Raporlar',         icon: 'chart' },
   { id: 'satis',      label: 'Satış Dashboard',  icon: 'fuel' },
   { id: 'ayarlar',    label: 'Ayarlar',          icon: 'settings' },
 ];

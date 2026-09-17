@@ -7,7 +7,7 @@ import {
   type ScheduleImportPlan,
   type ScheduleImportScope,
 } from '../../lib/scheduleImport';
-import { MONTH_NAMES } from '../../constants';
+import { MONTH_NAMES, isEmployedInRange, monthBounds } from '../../constants';
 import { Dialog } from '../ui/Dialog';
 import { Button } from '../ui/Button';
 import { Select } from '../ui/Select';
@@ -22,6 +22,8 @@ interface ScheduleImportModalProps {
   initialStation: string;
   initialDept: string;
   initialMonth: string;
+  ensureMonths: (months: string[]) => void;
+  isMonthLoaded: (yearMonth: string) => boolean;
   onClose: () => void;
   onApply: (plan: ScheduleImportPlan) => Promise<ScheduleImportApplyResult>;
 }
@@ -67,6 +69,8 @@ export function ScheduleImportModal({
   initialStation,
   initialDept,
   initialMonth,
+  ensureMonths,
+  isMonthLoaded,
   onClose,
   onApply,
 }: ScheduleImportModalProps) {
@@ -78,7 +82,12 @@ export function ScheduleImportModal({
   const [fileName, setFileName] = useState('');
   const [plan, setPlan] = useState<ScheduleImportPlan | null>(null);
   const [confirmed, setConfirmed] = useState(false);
+  // Yalnızca silme yapan import için ikinci, ayrı onay.
+  const [deleteConfirmed, setDeleteConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
+  // applying yalnız yazma aşaması için; busy şablon indirme ve önizlemeyi de kapsıyor.
+  // Yazma sürerken pencere kapatılamaz, bu yüzden ikisi ayrı tutuluyor.
+  const [applying, setApplying] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<ScheduleImportApplyResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -99,24 +108,42 @@ export function ScheduleImportModal({
     ),
     [employees, deptNames, scope.station],
   );
-  const scopedEmployees = useMemo(
-    () => employees.filter(e => e.status === 'Aktif' && e.station === scope.station && e.dept === scope.dept),
-    [employees, scope.station, scope.dept],
-  );
-  const canUseScope = !!scope.station && !!scope.dept && !!scope.yearMonth;
+  // Sayaç, şablona/plana gerçekten girecek personeli göstermeli: çizelgedeki
+  // gibi aralığı seçili ayla kesişmeyenler hariç tutulur.
+  const scopedEmployees = useMemo(() => {
+    const bounds = scope.yearMonth ? monthBounds(scope.yearMonth) : null;
+    return employees.filter(e =>
+      e.status === 'Aktif' && e.station === scope.station && e.dept === scope.dept &&
+      (!bounds || isEmployedInRange(e.startDate, e.endDate, bounds.start, bounds.end)),
+    );
+  }, [employees, scope.station, scope.dept, scope.yearMonth]);
+  // Seçilen ayın vardiyaları bellekte olmadan plan kurulamaz: eksik veriyle
+  // mevcut kayıtlar "yok" görünür ve import onları yeniden oluşturmaya çalışır.
+  const monthReady = !!scope.yearMonth && isMonthLoaded(scope.yearMonth);
+  useEffect(() => {
+    if (scope.yearMonth) ensureMonths([scope.yearMonth]);
+  }, [scope.yearMonth, ensureMonths]);
+
+  const canUseScope = !!scope.station && !!scope.dept && !!scope.yearMonth && monthReady;
   const needsConfirm = (plan?.existingCount ?? 0) > 0 || (plan?.summary.delete ?? 0) > 0;
-  const canApply = !!plan && plan.canApply && (!needsConfirm || confirmed) && !busy;
+  const needsDeleteConfirm = !!plan?.deleteOnly;
+  const canApply = !!plan && plan.canApply && (!needsConfirm || confirmed)
+    && (!needsDeleteConfirm || deleteConfirmed) && !busy;
 
   function resetImportState() {
     setFileName('');
     setPlan(null);
     setConfirmed(false);
+    setDeleteConfirmed(false);
     setError('');
     setResult(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
   function setScopeValue<K extends keyof ScheduleImportScope>(key: K, value: ScheduleImportScope[K]) {
+    // Yazma sürerken kapsam değiştirilemez: resetImportState planı sıfırlar,
+    // oysa döngü hâlâ eski plan üzerinde yazmaya devam ediyor olur.
+    if (applying) return;
     setScope(prev => {
       if (key === 'station') {
         const nextDept = deptNames.find(dp =>
@@ -187,6 +214,7 @@ export function ScheduleImportModal({
   async function handleApply() {
     if (!canApply || !plan) return;
     setBusy(true);
+    setApplying(true);
     setError('');
     try {
       const applied = await onApply(plan);
@@ -196,6 +224,7 @@ export function ScheduleImportModal({
       setError('Import işlemi tamamlanamadı.');
     } finally {
       setBusy(false);
+      setApplying(false);
     }
   }
 
@@ -213,14 +242,18 @@ export function ScheduleImportModal({
       desc="Seçili şube, departman ve ay için vardiya çizelgesini şablon Excel üzerinden yükleyin."
       onClose={onClose}
       width={760}
+      // Yazma sürerken kapatma kapalı: aksi halde kullanıcı pencereyi kapatıp
+      // süreci gözden kaybediyor, işlem arka planda devam ediyor ve sonuç
+      // özeti (kaç kayıt, kaç hata) hiç görünmüyor.
+      dismissible={!applying}
       footer={
         result ? (
           <Button icon="check" onClick={onClose}>Tamam</Button>
         ) : (
           <>
-            <Button variant="outline" onClick={onClose}>Vazgeç</Button>
+            <Button variant="outline" onClick={onClose} disabled={applying}>Vazgeç</Button>
             <Button icon="check" onClick={handleApply} disabled={!canApply}>
-              {busy ? 'İşleniyor...' : 'İçe Aktar'}
+              {applying ? 'İçe aktarılıyor…' : busy ? 'İşleniyor...' : 'İçe Aktar'}
             </Button>
           </>
         )
@@ -267,6 +300,12 @@ export function ScheduleImportModal({
             <Icon name="users" size={16} />
             <span>{scopeLabel(scope)} · {scopedEmployees.length} aktif personel</span>
           </div>
+          {!!scope.yearMonth && !monthReady && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9, color: 'var(--muted-foreground)', fontSize: 13 }}>
+              <Icon name="clock" size={16} />
+              <span>Seçili ayın vardiyaları yükleniyor…</span>
+            </div>
+          )}
           <Field label="Excel Dosyası">
             <div
               style={{
@@ -316,7 +355,24 @@ export function ScheduleImportModal({
           {error && <div style={{ color: 'var(--absent-fg)', fontSize: 13 }}>{error}</div>}
         </div>
 
-        {plan && !result && (
+        {/* Yazma tek transaction'da yapıldığı için sayaç yok: işlem ya tamamen
+            uygulanır ya hiç. Belirsiz süreli bir gösterge daha dürüst. */}
+        {applying && plan && (
+          <div className="col-2" style={{ display: 'grid', gap: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 13 }}>
+              <b>Vardiyalar yazılıyor…</b>
+              <span className="tnum" style={{ color: 'var(--muted-foreground)' }}>
+                {plan.actions.length} kayıt
+              </span>
+            </div>
+            <div className="progress-indet" />
+            <span style={{ fontSize: 12.5, color: 'var(--muted-foreground)' }}>
+              Tek işlemde uygulanıyor — kesinti olursa hiçbir kayıt değişmez.
+            </span>
+          </div>
+        )}
+
+        {plan && !result && !applying && (
           <div className="col-2" style={{ display: 'grid', gap: 14 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10 }}>
               <ResultLine label="Eşleşen" value={plan.matchedRows.length} />
@@ -346,6 +402,32 @@ export function ScheduleImportModal({
                 <span>Mevcut vardiyaların güncelleneceğini, boş hücrelerin ve Excel'de olmayan aktif personellerin seçili ay kayıtlarını sileceğini anlıyorum.</span>
               </label>
             )}
+
+            {/* Yalnızca silme yapan import: yanlış/boş şablon yüklemenin tipik
+                sonucu. Tek onay kutusuyla bir ayın silinmemesi için ikinci ve
+                açık bir onay isteniyor. */}
+            {plan.deleteOnly && plan.canApply && (
+              <div style={{ border: '1px solid var(--absent-bd)', background: 'var(--absent-bg)', borderRadius: 8, padding: 12, display: 'grid', gap: 9 }}>
+                <b style={{ fontSize: 13, color: 'var(--absent-fg)' }}>
+                  Bu işlem yalnızca silme yapacak
+                </b>
+                <span style={{ fontSize: 12.5, color: 'var(--absent-fg)' }}>
+                  {plan.noCodesInSheet
+                    ? `Excel'de tek bir vardiya kodu yok. `
+                    : 'Excel hiçbir yeni ya da değişmiş vardiya içermiyor. '}
+                  Uygulanırsa {plan.summary.delete} kayıt silinecek, hiçbir kayıt eklenmeyecek.
+                </span>
+                <label style={{ display: 'flex', gap: 9, alignItems: 'flex-start', fontSize: 13, color: 'var(--absent-fg)' }}>
+                  <input
+                    type="checkbox"
+                    checked={deleteConfirmed}
+                    onChange={e => setDeleteConfirmed(e.target.checked)}
+                    style={{ marginTop: 2 }}
+                  />
+                  <span>{plan.summary.delete} kaydın silinmesini bilerek istiyorum.</span>
+                </label>
+              </div>
+            )}
           </div>
         )}
 
@@ -355,8 +437,7 @@ export function ScheduleImportModal({
               Import tamamlandı. {result.created} kayıt oluşturuldu, {result.updated} kayıt güncellendi, {result.deleted} kayıt silindi. {result.skippedNames.length} Excel satırı personel eşleşmediği için atlandı. {result.failed} kayıt hata aldı.
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10 }}>
-              <ResultLine label="Status korundu" value={result.statusPreserved} />
-              <ResultLine label="Planlandı yapıldı" value={result.resetToPlanned} />
+              <ResultLine label="Değişmeyen hücre" value={result.unchangedCells} />
               <ResultLine label="Hata" value={result.failed} />
             </div>
             <MessageList title="Atlanan İsimler" items={result.skippedNames} />
