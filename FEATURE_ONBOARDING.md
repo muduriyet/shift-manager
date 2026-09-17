@@ -1,7 +1,7 @@
 # İşe Giriş Süreçleri — Personel İşe Alım Takibi (Onboarding)
 
-Son güncelleme: 2026-09-17
-Durum: **TÜM SPRINTLER TAMAMLANDI (S1–S8)** — özellik uçtan uca çalışıyor: liste, detay modalı (okuma+yazma), Yeni Süreç, evrak tanımı yönetimi, otomatik ve elle arşivleme. Şema canlıya uygulandı. Dal: `feat/ise-giris-surecleri`.
+Son güncelleme: 2026-09-18
+Durum: **TÜM SPRINTLER TAMAMLANDI (S1–S8)** — özellik uçtan uca çalışıyor: liste, detay modalı (okuma+yazma), Yeni Süreç, evrak tanımı yönetimi, otomatik ve elle arşivleme. Şema canlıya uygulandı. QA turu 1 tamamlandı ve bulguları kapatıldı (aşağıda).
 
 İlerleme notu:
 - ✅ **Ön koşul — CSS token'ları (`f47308a`):** `--late-*` tanımlandı, `.badge-active .dot` rengi eklendi. `Stat tone="late"` ve `<Badge status="Aktif" dot />` bu değişkenlere başvuruyordu ama tanımlı değillerdi (TD-015'te "Geç Kaldı" silinirken temizlenmiş, üç kullanım geride kalmış). `SettingsScreen` ve `TaskNotebookScreen`'deki mevcut iki bozukluğu da kapattı.
@@ -520,6 +520,71 @@ Plan yazıldıktan sonra değişen veya plandaki hâliyle yanlış olacak kararl
 | `Select` `disabled` | "Şube seçilene kadar Departman pasif" | düştü | `Select` böyle bir prop tanımlamıyor; ayrıca `stations`/`departments` arasında veri bağımlılığı yok. |
 
 Ayrıca plan yazıldıktan sonra `main`'de Raporlar, Günlük Kontrol ve haftalık çizelge görünümü kaldırıldı; `shifts.status` kolonu düşürüldü. Dal `efa54bd` ile güncellendi — o merge olmadan bu dalda vardiya ekleme PGRST204 verirdi.
+
+## QA Turu 1 (2026-09-18)
+
+Özellik `main`'e alındıktan sonra harici bir QA turu yapıldı (`FEATURE_ONBOARDING_QA.md`,
+A1–G5). Ana akışların tamamı geçti; raporlanan 7 bulgunun hepsi koda karşı doğrulandı,
+yanlış pozitif çıkmadı. Dal: `fix/isegiris-qa-1`.
+
+### Düzeltilenler
+
+| Bulgu | Kök neden | Düzeltme |
+|---|---|---|
+| Yeşil evrak satırı süreç bitmeden "tamamlandı" diyordu | Satır evrak tiklerinden sürülüyor, tamamlanma `stage >= 3`'ten geliyor | Metin `surecTamam`'a bağlandı. Sabit "3. adımı işaretleyin" yapılmadı: süreç gerçekten bitince ters yönde çelişki çıkarırdı. |
+| Oluşturulma tarihi bir gün geri | `created_at` `timestamptz`; `fmtDMY` ilk 10 karakteri kesip UTC gününü basıyordu | `fmtDMY` girdi biçimini ayırt ediyor. Ayrı fonksiyon yazılmadı — TS'te ikisi de `string`, çağıran kolon tipini bilemiyor; bug bundan çıkmıştı. |
+| Sayaç ile tablo satır sayısı uyuşmuyor | (a) `fetchEmployees` sayfalamıyordu (b) `employees` girişte bir kez yükleniyordu | (a) `fetchAllRows` (b) eksik personeli çekip App state'ine ekleyen effect |
+| **Aşama yazımı başarısızken arşivleme** | `pickStage` iyimser; kapanış iyimser değeri taşıyıp arşivliyordu | `archiveOnboardingIfComplete` koşulu `UPDATE`'in içine koyuyor (`.eq('stage', 3)`). Ayrıca aşama yazımına tek uçuş kilidi. |
+| Ad + telefon/IBAN yarım kalabiliyor | İki ayrı yazma | `save_onboarding_person` RPC'si, tek transaction |
+
+Bir de yan bulgu: `docSetDef` ve `allOriginalsReceived` ölü koddu (`noUnusedLocals` kapalı
+olduğu için tsc uyarmıyor). `allOriginalsReceived`'ı yeşil satıra bağlamak düşünüldü ama
+doğru değil — view sayaçlarını okuyor, bunlar modal açıkken bayat kalıyor. İkisi de silindi;
+`setOnboardingContact` ve `updateEmployeeName` de RPC'ye devredilince kullanıcısız kaldı.
+
+### Bilinçli olarak ertelenenler
+
+**RLS `using (true)` — IBAN her authenticated kullanıcı tarafından okunabilir.**
+QA bunu P1 olarak işaretledi ve doğru; ancak bu politika bu özelliğe özgü değil. Repodaki
+15 politikanın tamamı aynı (`employees`, `shifts`, `tasks`, `sales_daily_reports` dahil) ve
+`profiles` tablosunda rol kolonu yok — uygulamada bir yetki sistemi hiç mevcut değil.
+Düzeltmek, uygulama genelinde rol sistemi kurmak demek; bu özelliğin kapsamı değil.
+**Karar: kabul edildi.** Rol sistemi ayrı bir iş olarak ele alınacak; o zaman IBAN alan
+bazlı yetkilendirme ve maskeleme de birlikte düşünülmeli.
+
+**Erişilebilirlik.** `Dialog`'da `role="dialog"`, `aria-modal`, focus trap ve X butonunda
+erişilebilir ad yok; tablo satırları yalnız fareyle açılıyor. İkisi de bu özelliğin dışına
+taşıyor: `Dialog.tsx` 8 dosyadaki tüm pencerelerce paylaşılıyor, `<tr onClick>` deseni
+[TaskNotebookScreen.tsx:253](src/components/tasks/TaskNotebookScreen.tsx#L253)'te de var.
+**Karar: ayrı bir erişilebilirlik turu.**
+
+### Bilinçli kalan artık
+
+Arşiv isteği aşama isteğinden önce veritabanına ulaşırsa (HTTP sıra garantisi yok)
+arşivleme kaçar ve tamamlanmış süreç listede kalır. İyi huylu ve kendi kendini düzeltir:
+kullanıcı süreci tekrar açıp kapatınca arşivlenir, veri kaybı yok. `Dialog`'un
+`dismissible` prop'uyla kapatmak değerlendirildi ama alınmadı — supabase-js'te varsayılan
+timeout yok, asılı bir istek modalı kurtarılamaz şekilde kilitlerdi (X gizlenir, Escape ve
+backdrop ölür). İyi huylu bir kaçırmayı kalıcı kilitle takas etmek kötü bir değiş tokuş.
+
+### Doğrulama
+
+Canlı veritabanında, `QATest` ön ekli iki geçici süreçle. Sayımlar başlangıç değerlerine
+döndürüldü (`personel=47 · süreç=0 · aktif katalog=17 · kalan QATest=0`).
+
+- Tarih: node ile dört girdi (date, timestamptz, bozuk, null) + gece yarısı sınırı
+  (20:59:59Z → 17.09, 21:00:00Z → 18.09); ardından UI'da "Oluşturulma Tarihi 18.09.2026"
+- Arşivleme yarışı: aşama `PATCH`'i 2,5 sn gecikmeli 500 ile kesildi, 3. adıma tıklanıp
+  modal hemen kapatıldı → süreç listede kaldı, `stage=1`, `archived_at` null. İstek
+  URL'inde koruma görünüyor: `stage=eq.3&archived_at=is.null`
+- Tek uçuş kilidi: yazma uçuştayken üç buton da `disabled`, 3'e yapılan tık yutuldu, DB 2'de kaldı
+- Sayaç/satır: uygulama açıkken SQL'den ikinci süreç açıldı → yenilemede satır göründü,
+  sayaç eşitlendi, ağ kaydında tek `employees?id=eq.123` isteği
+- Atomiklik: ikinci `UPDATE` NOT NULL ihlali verdiğinde ilki de geri alındı; eşleşmeyen
+  personel id'si reddedildi; tarayıcıdan (RLS + `SECURITY INVOKER` altında) mutlu yol çalışıyor
+- Temiz sekmede sıfır konsol kaydı; `npm run build` başarılı
+
+---
 
 ## Kritik dosyalar
 
