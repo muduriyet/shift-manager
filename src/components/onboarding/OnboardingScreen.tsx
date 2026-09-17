@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Employee, Station, Department, Role, Profile, Onboarding } from '../../types';
-import { archiveOnboarding, fetchOnboardings } from '../../lib/db';
+import { archiveOnboarding, createOnboardingWithEmployee, fetchEmployee, fetchOnboardings } from '../../lib/db';
 import { activeDocCount, fmtDMY, stageDef, trLower } from '../../lib/onboarding';
 import { OnboardingModal } from '../modals/OnboardingModal';
+import { OnboardingCreateModal, type OnboardingCreateForm } from '../modals/OnboardingCreateModal';
+import { Button } from '../ui/Button';
 import { Avatar } from '../ui/Avatar';
 import { Icon } from '../ui/Icon';
 import { Select } from '../ui/Select';
@@ -39,13 +41,14 @@ function StageBar({ stage }: { stage: number }) {
 }
 
 export function OnboardingScreen({
-  employees, stations, departments, roles, profiles, onEmployeeSaved, onToast,
+  employees, stations, departments, roles, profiles, currentUserId, onEmployeeSaved, onToast,
 }: OnboardingScreenProps) {
   const [list, setList] = useState<Onboarding[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
   const [station, setStation] = useState('Tümü');
   const [openId, setOpenId] = useState<number | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
 
   // Ekran-yerel fetch (alive guard) — App'in giriş anındaki Promise.all'ına
   // eklenmedi; oradaki bir hata tüm uygulamayı bloke ediyor.
@@ -72,6 +75,45 @@ export function OnboardingScreen({
       console.error('Liste yenilenemedi', err);
       onToast('Liste yenilenemedi');
     }
+  }
+
+  // Personel + süreç tek transaction (RPC). employee_id olmadan yeni personel
+  // App state'ine giremez ve liste satırı ad/pozisyon eşleştiremeyip boş render eder.
+  async function handleCreate(form: OnboardingCreateForm) {
+    const stationId = stations.find(s => s.name === form.station)?.id;
+    const deptId    = departments.find(d => d.name === form.dept)?.id;
+    const roleId    = roles.find(r => r.name === form.role)?.id;
+    if (stationId == null || deptId == null || roleId == null) {
+      onToast('Geçersiz şube, departman veya pozisyon');
+      return;
+    }
+    try {
+      const { onboardingId, employeeId } = await createOnboardingWithEmployee(
+        { name: form.name, stationId, deptId, roleId, startDate: form.startDate },
+        currentUserId,
+      );
+      onEmployeeSaved(await fetchEmployee(employeeId));
+      await reload();
+      setCreateOpen(false);
+      setOpenId(onboardingId);     // doğrudan detaya geç
+    } catch (err) {
+      console.error('Süreç oluşturulamadı', err);
+      onToast('Süreç oluşturulamadı');
+    }
+  }
+
+  // Elle arşivleme: tamamlanmadan iptal edilen süreçler için (işe alım
+  // vazgeçildi vb.). S4'teki otomatik arşivlemeden ayrı bir yol.
+  async function handleArchive(id: number) {
+    setOpenId(null);
+    try {
+      await archiveOnboarding(id);
+      onToast('Süreç arşivlendi');
+    } catch (err) {
+      console.error('Süreç arşivlenemedi', err);
+      onToast('Süreç arşivlenemedi');
+    }
+    void reload();
   }
 
   // Arşivleme kararı BURADA, modalın içinde değil: Dialog X butonu, Escape ve
@@ -133,6 +175,9 @@ export function OnboardingScreen({
         <div>
           <h1 className="page-title">İşe Giriş Süreçleri</h1>
           <p className="page-desc">Yeni personelin işe giriş adımlarını ve evrak durumunu takip edin</p>
+        </div>
+        <div className="page-actions">
+          <Button icon="plus" onClick={() => setCreateOpen(true)}>Yeni Süreç</Button>
         </div>
       </div>
 
@@ -255,6 +300,17 @@ export function OnboardingScreen({
           onEmployeeSaved={onEmployeeSaved}
           onToast={onToast}
           onClose={handleModalClose}
+          onArchive={handleArchive}
+        />
+      )}
+
+      {createOpen && (
+        <OnboardingCreateModal
+          stations={stations}
+          departments={departments}
+          roles={roles}
+          onCancel={() => setCreateOpen(false)}
+          onSave={handleCreate}
         />
       )}
     </div>

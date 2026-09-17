@@ -28,6 +28,8 @@ interface OnboardingModalProps {
   // Son aşamayı geri bildirir: arşivleme kararı EKRANDA veriliyor ki
   // X / Escape / backdrop üç kapanış yolu da aynı kontrolden geçsin.
   onClose: (finalStage: OnboardingStage) => void;
+  // Elle arşivleme: tamamlanmadan iptal edilen süreçler için.
+  onArchive: (id: number) => void;
 }
 
 // ---- Stepper ----
@@ -208,7 +210,7 @@ function RailRow({ label, value }: { label: string; value: string }) {
 
 export function OnboardingModal({
   process, employee, profiles, stations, departments, roles,
-  onEmployeeSaved, onToast, onClose,
+  onEmployeeSaved, onToast, onClose, onArchive,
 }: OnboardingModalProps) {
   const [stage, setStage] = useState<OnboardingStage>(process.stage);
   const [docs, setDocs] = useState<OnboardingDoc[]>([]);
@@ -220,6 +222,7 @@ export function OnboardingModal({
   const [notEdit, setNotEdit] = useState(false);
   const [notDraft, setNotDraft] = useState('');
   const [duzenleme, setDuzenleme] = useState<'personel' | 'gorev' | null>(null);
+  const [iptalOnayi, setIptalOnayi] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -293,6 +296,11 @@ export function OnboardingModal({
         desc={`${employee.role} • ${employee.station} Şubesi • ${employee.dept}`}
         width={980}
         onClose={() => onClose(stage)}
+        footer={tamam ? undefined : (
+          <Button variant="danger-ghost" icon="trash" onClick={() => setIptalOnayi(true)}>
+            Süreci İptal Et
+          </Button>
+        )}
       >
         <div className="dialog-body dialog-body-rail">
           {/* ---- Ana kolon ---- */}
@@ -407,6 +415,29 @@ export function OnboardingModal({
           </div>
         </div>
       </Dialog>
+
+      {iptalOnayi && (
+        <Dialog
+          title="Süreci İptal Et"
+          width={400}
+          onClose={() => setIptalOnayi(false)}
+          footer={
+            <>
+              <Button variant="outline" onClick={() => setIptalOnayi(false)}>Vazgeç</Button>
+              <Button variant="danger-ghost" icon="trash" onClick={() => onArchive(process.id)}>
+                Evet, İptal Et
+              </Button>
+            </>
+          }
+        >
+          <div className="dialog-body">
+            <p className="col-2" style={{ margin: 0, fontSize: 13.5, color: 'var(--muted-foreground)', lineHeight: 1.5 }}>
+              <b>{employee.name}</b> için açılan işe giriş süreci arşivlenecek ve listeden düşecek.
+              Evrak kayıtları silinmez, personel kaydına dokunulmaz.
+            </p>
+          </div>
+        </Dialog>
+      )}
 
       {duzenleme === 'personel' && (
         <PersonelDuzenle
