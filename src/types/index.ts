@@ -18,7 +18,6 @@ export interface Role {
 }
 export type RoleName = string;
 export type ShiftCodeKey = 'S' | 'Ö' | 'G' | 'Öz' | 'İ' | 'Yİ' | 'Üİ' | 'İs' | '-';
-export type ShiftStatus = 'Planlandı' | 'Geldi' | 'Gelmedi';
 export type EmployeeStatus = 'Aktif' | 'Pasif';
 export type ViewId = 'cizelge' | 'personeller' | 'ayarlar' | 'satis' | 'gorev';
 
@@ -64,7 +63,6 @@ export interface Shift {
   role: RoleName;
   station: StationName;
   dept: DepartmentName;
-  status: ShiftStatus;
   note: string;
 }
 

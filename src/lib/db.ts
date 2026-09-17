@@ -1,7 +1,7 @@
 import { getSupabaseClient } from './supabase';
 import type {
   Employee, Shift, ShiftCodeKey,
-  StationName, DepartmentName, RoleName, ShiftStatus, EmployeeStatus,
+  StationName, DepartmentName, RoleName, EmployeeStatus,
   Station, Department, Role,
   SalesImportConfig, SalesConfigStatus, SalesMapping, SalesDailyReport,
   SalesImportScope, SalesReportValues, SalesImportApplyResult, SalesDailyView,
@@ -126,7 +126,6 @@ interface ShiftRow {
   role: string;
   station: string;
   dept: string;
-  status: string;
   note: string;
 }
 
@@ -163,7 +162,6 @@ function toShift(r: ShiftRow): Shift {
     role: r.role as RoleName,
     station: r.station as StationName,
     dept: r.dept as DepartmentName,
-    status: r.status as ShiftStatus,
     note: r.note,
   };
 }
@@ -259,7 +257,6 @@ export async function createShift(form: {
   start: string;
   end: string;
   role: RoleName;
-  status: ShiftStatus;
   note: string;
   code?: ShiftCodeKey;
 }): Promise<Shift> {
@@ -276,7 +273,6 @@ export async function createShift(form: {
       role: form.role,
       station: form.station,
       dept: form.dept,
-      status: form.status,
       note: form.note,
     })
     .select()
@@ -290,7 +286,7 @@ export async function updateShift(
   form: {
     empId?: number; station?: StationName; dept?: DepartmentName;
     shiftDate?: string; start?: string; end?: string;
-    role?: RoleName; status?: ShiftStatus; note?: string;
+    role?: RoleName; note?: string;
     code?: ShiftCodeKey;
   },
 ): Promise<Shift> {
@@ -305,7 +301,6 @@ export async function updateShift(
   if (form.start  !== undefined) patch.start_time = form.start;
   if (form.end    !== undefined) patch.end_time   = form.end;
   if (form.role   !== undefined) patch.role       = form.role;
-  if (form.status !== undefined) patch.status     = form.status;
   if (form.note   !== undefined) patch.note       = form.note;
   if (form.code   !== undefined) patch.code       = form.code;
 
@@ -331,7 +326,6 @@ export interface ScheduleImportRow {
   role: RoleName;
   station: StationName;
   dept: DepartmentName;
-  status: ShiftStatus;
   note: string;
 }
 
@@ -359,7 +353,6 @@ export async function applyScheduleImport(
       role: r.role,
       station: r.station,
       dept: r.dept,
-      status: r.status,
       note: r.note,
     })),
   };

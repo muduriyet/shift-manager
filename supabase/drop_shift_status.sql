@@ -1,0 +1,29 @@
+-- ============================================================
+-- shifts.status kolonunu kaldırır (devam takibi: Planlandı/Geldi/Gelmedi)
+-- Idempotent. Güncellenmiş apply_schedule_import.sql'den SONRA çalıştırın.
+-- Yeni/sıfır kurulumlar için supabase/schema.sql zaten bu kolonu içermez.
+-- ============================================================
+--
+-- Gerekçe: bir personel gelmediyse bunun bir statüsü vardır (İzin, Yıllık İzin,
+-- Ücretsiz İzin, İstirahat) ve bilgiyi o günün VARDİYA KODU taşır. Ayrı bir
+-- devam bayrağına yer yok. Kolon, Günlük Kontrol ve Raporlar ekranları
+-- kaldırıldıktan sonra yazılıp hiç okunmayan bir alana dönüşmüştü.
+--
+-- Ön koşul: apply_schedule_import fonksiyonu status'ü artık insert etmiyor
+-- olmalı, yoksa import ve ızgara toplu kod atama 42703 ile kırılır.
+--
+-- shifts_status_check constraint'i kolonla birlikte otomatik düşer; ayrı bir
+-- DROP CONSTRAINT satırına gerek yok.
+--
+-- ---- GERİ ALMA ----
+-- Kolonu geri getirmek gerekirse:
+--   alter table shifts add column status text not null default 'Planlandı';
+--   alter table shifts add constraint shifts_status_check
+--     check (status in ('Planlandı', 'Geldi', 'Gelmedi'));
+-- Düşürülmeden önceki tek istisna kayıtlar (3.862 satırın 3'ü; üçü de kodu
+-- 'İ' (İzin) olan, yani zaten çelişkili veri — izinli bir güne devamsızlık
+-- işaretlenmiş):
+--   update shifts set status = 'Gelmedi' where id in (2627, 2632);  -- Haldun Daşdemir, Zafer Kalat · 2026-06-11
+--   update shifts set status = 'Geldi'   where id = 2640;           -- Ahmet Erdem İnan · 2026-06-11
+
+alter table shifts drop column if exists status;

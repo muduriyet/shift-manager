@@ -1,6 +1,6 @@
 import type {
   ShiftCodeKey,
-  ShiftStatus, ShiftCodeDef, MonthDay, ShiftTime,
+  ShiftCodeDef, MonthDay, ShiftTime,
 } from '../types';
 
 

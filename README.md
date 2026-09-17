@@ -52,6 +52,7 @@ Supabase Auth'ta kullanıcı oluştur:
 Mevcut eski veritabanları için opsiyonel migration dosyaları:
 
 - `supabase/add_employee_shift_schedule_names.sql`
+- `supabase/drop_shift_status.sql` (güncellenmiş `apply_schedule_import.sql`'den sonra)
 - `supabase/update_seed_config_cash_lookup.sql`
 - `supabase/update_seed_config_discount_lookup.sql`
 

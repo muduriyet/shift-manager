@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Shift, Employee, ShiftCodeKey, StationName, DepartmentName, RoleName, ShiftStatus } from '../../types';
+import type { Shift, Employee, ShiftCodeKey, StationName, DepartmentName, RoleName } from '../../types';
 import { SHIFT_TIMES, shiftById, TODAY_DATE_STR, isWithinEmployment } from '../../constants';
 import { Dialog } from '../ui/Dialog';
 import { Button } from '../ui/Button';
@@ -15,7 +15,6 @@ interface ShiftFormData {
   start: string;
   end: string;
   role: RoleName;
-  status: ShiftStatus;
   note: string;
 }
 
@@ -61,9 +60,6 @@ export function ShiftModal({ shift, employees, stationNames, deptNames, roleName
     start:     shift?.start     ?? '08:00',
     end:       shift?.end       ?? '16:00',
     role:      shift?.role      ?? emp0?.role    ?? roleNames[0] ?? '',
-    // Devam takibi kaldırıldı: bilgiyi vardiya kodu taşıyor, ayrı bir durum
-    // bayrağı yok. Alan tipte duruyor ama her zaman 'Planlandı'.
-    status:    'Planlandı',
     note:      shift?.note      ?? '',
   });
 

@@ -14,7 +14,7 @@
 --   "rows": [                              -- oluşturulacak/güncellenecek satırlar
 --     { "emp_id":1, "shift_date":"2026-08-01", "code":"S", "start_time":"08:00",
 --       "end_time":"16:00", "role":"Pompacı", "station":"Ümraniye",
---       "dept":"Akaryakıt", "status":"Planlandı", "note":"" }, ...
+--       "dept":"Akaryakıt", "note":"" }, ...
 --   ]
 -- }
 --
@@ -65,7 +65,7 @@ begin
   select count(*) into v_replaced from removed;
 
   -- 3. Yeni satırlar
-  insert into shifts (emp_id, day_index, shift_date, code, start_time, end_time, role, station, dept, status, note)
+  insert into shifts (emp_id, day_index, shift_date, code, start_time, end_time, role, station, dept, note)
   select
     (r->>'emp_id')::bigint,
     -- Pazartesi = 0 … Pazar = 6 (uygulamadaki dayIndex ile aynı)
@@ -77,7 +77,6 @@ begin
     r->>'role',
     r->>'station',
     r->>'dept',
-    coalesce(r->>'status', 'Planlandı'),
     coalesce(r->>'note', '')
   from jsonb_array_elements(v_rows) r;
   get diagnostics v_written = row_count;

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
-import type { ViewId, Employee, Shift, ShiftStatus, ShiftCodeKey, StationName, DepartmentName, RoleName, Station, Department, Role, SalesImportConfig, Task, Profile } from './types';
+import type { ViewId, Employee, Shift, ShiftCodeKey, StationName, DepartmentName, RoleName, Station, Department, Role, SalesImportConfig, Task, Profile } from './types';
 import { SHIFT_CODES, WORK_CODES, isWithinEmployment, yearMonthOf } from './constants';
 import { useShiftStore } from './hooks/useShiftStore';
 import {
@@ -48,7 +48,6 @@ interface ShiftFormData {
   start: string;
   end: string;
   role: RoleName;
-  status: ShiftStatus;
   note: string;
 }
 
@@ -318,11 +317,6 @@ export default function App() {
         start: isWork ? sc.start! : '',
         end:   isWork ? sc.end!   : '',
         role: emp.role, station: emp.station, dept: emp.dept,
-        // Izgarada kod düzeltmek devam kaydını silmez: mevcut kaydın durumu
-        // (Geldi/Gelmedi) korunur, yalnızca yeni kayıt Planlandı başlar.
-        // Excel import'u bilinçli olarak Planlandı'ya çeker; ızgara düzeltmesi
-        // ondan farklıdır ve öyle kalmalı.
-        status: existing?.status ?? 'Planlandı',
         note: existing?.note ?? '',
       });
     }
@@ -513,7 +507,6 @@ export default function App() {
           role: action.emp.role,
           station: action.emp.station,
           dept: action.emp.dept,
-          status: 'Planlandı',
           // Güncellemede mevcut not korunur; yeni kayıtta boş başlar.
           note: action.existing?.note ?? '',
         });
@@ -609,7 +602,7 @@ export default function App() {
               id: 0, empId, shiftDate, dayIndex: 0, code: '-',
               start: '08:00', end: '16:00',
               role: emp.role, station: emp.station, dept: emp.dept,
-              status: 'Planlandı', note: '',
+              note: '',
             });
             setShiftModalOpen(true);
           }}
