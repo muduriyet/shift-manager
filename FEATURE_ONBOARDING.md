@@ -1,12 +1,20 @@
 # İşe Giriş Süreçleri — Personel İşe Alım Takibi (Onboarding)
 
-Son güncelleme: 2026-07-25
-Durum: **PLANLAMA TAMAMLANDI, UYGULAMA BAŞLAMADI** — S1 sırada. Ön koşul niteliğindeki iki UI düzeltmesi canlıya alındı; şema ve ekranlar henüz yazılmadı.
+Son güncelleme: 2026-09-17
+Durum: **TÜM SPRINTLER TAMAMLANDI (S1–S8)** — özellik uçtan uca çalışıyor: liste, detay modalı (okuma+yazma), Yeni Süreç, evrak tanımı yönetimi, otomatik ve elle arşivleme. Şema canlıya uygulandı. Dal: `feat/ise-giris-surecleri`.
 
 İlerleme notu:
-- ✅ **Ön koşul — CSS token'ları (`f47308a`):** `--late-bg/-fg/-bd/-dot` tanımlandı ve `.badge-active .dot` rengi eklendi. `Stat tone="late"` ve `<Badge status="Aktif" dot />` bu değişkenlere başvuruyordu ama tanımlı değillerdi (TD-015'te "Geç Kaldı" statüsü silinirken temizlenmiş, üç kullanım geride kalmış). Yeni ekranları açmakla kalmadı, `SettingsScreen` ve `TaskNotebookScreen`'deki mevcut iki bozukluğu da kapattı. Tarayıcıda computed style ile doğrulandı.
-- ✅ **Ön koşul — `Dialog` Escape yığını (`2ec21e4`):** `Dialog` her örnek için `document`'e ayrı dinleyici ekliyordu; iki dialog açıkken tek Escape ikisini birden kapatıyordu (bugün `TaskModal` arşiv onayında yaşanıyor). Modül seviyesinde tek dinleyici + `onClose` ref yığınına geçildi. Bu özelliğin iç içe düzenleme dialog'u için zorunlu ön koşuldu; bağımsız olduğu için ayrıca gönderildi. Tarayıcıda gerçek tuş basımıyla 7 çağrı yerinin hepsi doğrulandı.
-- ⬜ **S1–S8:** şema, liste, detay modal, yazma, Yeni Süreç, evrak tanımları, QA, dokümantasyon.
+- ✅ **Ön koşul — CSS token'ları (`f47308a`):** `--late-*` tanımlandı, `.badge-active .dot` rengi eklendi. `Stat tone="late"` ve `<Badge status="Aktif" dot />` bu değişkenlere başvuruyordu ama tanımlı değillerdi (TD-015'te "Geç Kaldı" silinirken temizlenmiş, üç kullanım geride kalmış). `SettingsScreen` ve `TaskNotebookScreen`'deki mevcut iki bozukluğu da kapattı.
+- ✅ **Ön koşul — `Dialog` Escape yığını (`2ec21e4`):** her Dialog `document`'e ayrı dinleyici ekliyordu; iki dialog açıkken tek Escape ikisini birden kapatıyordu. Modül seviyesinde tek dinleyici + `onClose` **ref** yığınına geçildi — ref şart, çünkü çağrı yerleri satır içi arrow geçiyor ve `[onClose]` bağımlılığı her render'da yığını yeniden sıralardı. Bu özelliğe bağlı olmadığı için ayrıca gönderildi; 7 çağrı yeri test edildi.
+- ✅ **S1 (`ccb5cd7`) — Şema + veri katmanı + iskelet:** 3 tablo, `onboarding_list_view`, 2 RPC, 3 trigger, RLS. Mevcut şemaya tek `alter table` yok. Canlıda doğrulandı: süreç insert → 17 evrak satırı; atomiklik testi (geçersiz `role_id` → hiçbir satır yazılmadı).
+- ✅ **S2 (`f1afe7c`) — Liste ekranı:** 3 stat kartı, TR arama, şube filtresi, 6 kolonlu tablo, aşama çubuğu, aşamaya göre değişen paydalı evrak kolonu, iki durumlu EmptyState.
+- ✅ **S3 (`a45a4a6`) — Detay modalı (okuma):** üç durumlu stepper, 3 evrak tablosu, sağ ray, iki bilgi kutusu. Sağ raydaki telefon/IBAN/not `fetchOnboarding(id)` ile ayrıca çekiliyor (liste satırı taşımıyor).
+- ✅ **S4 (`5d3a9df`) — Detay modalı (yazma):** evrak toggle (iyimser + geri alma), aşama değiştirme (ileri/geri), not, iki iç içe düzenleme dialogu, kapanışta otomatik arşivleme.
+- ✅ **Merge (`efa54bd`)** — çizelge sadeleştirme çalışması (15 commit) dala alındı. Dal `shifts.status` yazmaya devam ediyordu ve o kolon düşürülmüştü; merge olmadan vardiya ekleme PGRST204 verirdi.
+- ✅ **S5 (`d85be40`) — Yeni Süreç + elle arşivleme:** pop-up personeli **oluşturur** (seçmez). RPC → `fetchEmployee` → `onEmployeeSaved` zinciri, sayfa yenilemeden Personel Listesi'nde doğrulandı.
+- ✅ **S6 (`857c587`) — Evrak Tanımları modalı:** katalog ekleme/kaldırma. Asimetrik yayılım canlıda kanıtlandı: ekleme açık süreçlere düştü (17→18), arşivli süreç dokunulmadı; kaldırma mevcut süreçlerden satır silmedi (işaretli tik korundu), yeni süreç kaldırılanı almadı.
+- ✅ **S7 (`d088c17`) — QA sertleştirme:** Dialog yığını 3 seviye, iyimser geri alma (gecikmeli 500 ile), boş lookup koruması, 58 karakterlik ad, 40 açık süreç, iki sekmeli eşzamanlılık, 32 tasarım metninin birebir denetimi. Tek kod değişikliği: `fetchOnboardings` sayfalandı.
+- ✅ **S8 — Dokümantasyon:** bu dosya, `context.md` veri modeli ve `README.md` ekran listesi.
 
 Bu dosya, Claude Design'da (`Shift-Manager UI Kit` → `templates/ise-giris-sureci` ve `templates/ise-giris-surecleri`) tasarlanan **İşe Giriş Süreçleri** ekranlarının canlı uygulamaya entegrasyon spesifikasyonunu ve uygulama adımlarını tanımlar. Yaşayan (living) dokümandır; her sprint tamamlandıkça güncellenir.
 
@@ -21,7 +29,7 @@ Yeni personelin işe giriş süreci bugün uygulama dışında takip ediliyor. S
 - **İşe Giriş Süreçleri** (liste) — `templates/ise-giris-surecleri/IseGirisSurecleri.dc.html`
 - **İşe Giriş Süreci** (detay) — `templates/ise-giris-sureci/IseGirisSureci.dc.html`
 
-**Veritabanı tarafı tamamen sıfırdan** — repoda da canlı DB'de de işe giriş/evrak/aşama ile ilgili hiçbir tablo yok. Buna karşılık UI tarafı hazır: gereken 17 ikonun 17'si ve tüm bileşenler mevcut.
+Veritabanı tarafı sıfırdan yazıldı; `supabase/create_onboarding.sql` canlıya uygulanmış durumda. UI tarafı zaten hazırdı: gereken 17 ikonun 17'si ve tüm bileşenler mevcuttu.
 
 Mimari olarak **Görev Defteri** örnek alınıyor: liste ekranı + ağır bir detay **modal**'ı.
 
@@ -60,9 +68,9 @@ Mimari olarak **Görev Defteri** örnek alınıyor: liste ekranı + ağır bir d
 
 Bu, personelin önce bir bekleme havuzunda durduğu bir modeli anlatıyor. Öyle bir havuz yok ve `is_active` bu iş için kullanılamaz:
 
-- Canlı veride 41 personelin 2'si pasif; **ikisinin de `end_date`'i dolu** — yani `is_active = false` pratikte *işten ayrıldı* demek.
+- Planlama anında canlı veride 41 personelin 2'si pasifti ve **ikisinin de `end_date`'i doluydu** — yani `is_active = false` pratikte *işten ayrıldı* demek.
 - Pasife alınan personel dört yerden **komple kayboluyor**: Çizelge ([ScheduleScreen.tsx:95](src/components/schedule/ScheduleScreen.tsx#L95)), yeni vardiya ([ShiftModal.tsx:94](src/components/modals/ShiftModal.tsx#L94)), Excel dışa aktarma ([scheduleExport.ts:83](src/lib/scheduleExport.ts#L83)) ve **Excel içe aktarma eşleşmesi** ([scheduleImport.ts:140](src/lib/scheduleImport.ts#L140)).
-- Buna karşılık Günlük Kontrol ve Raporlar `is_active`'e **hiç bakmıyor** — tutarsız davranış riski.
+- Buna karşılık bazı ekranlar `is_active`'e **hiç bakmıyordu** — tutarsız davranış riski. (O ekranlar, Günlük Kontrol ve Raporlar, sonradan çizelge sadeleştirmesinde kaldırıldı.)
 - Kolon `boolean not null`; üçüncü durum için yer yok.
 
 **Doğru mekanizma zaten var: `start_date`.** `isWithinEmployment()` ([constants/index.ts:42](src/constants/index.ts#L42)) başlangıç öncesi günlere atamayı engelliyor ve çizelgede taralı gösteriyor.
@@ -340,7 +348,7 @@ Yalnız açık süreçler gösterildiği için tasarımın sekmeleri ve `Durum` 
 
 `Süreç Adımı` ulaşılan son kilometre taşını gösterir (`STAGES[stage].short`). Bir ara "Sırada: …" denendi ve **geri alındı**: yanındaki `Evrak` kolonu zaten şu an toplanan seti gösteriyor, ikisi yan yana çelişiyordu. Solda **nerede olduğun**, sağda **şu an ne topladığın**. `Devam Ediyor` rozeti yalnız detaydaki stepper'da yaşıyor.
 
-- `.stat-grid` `repeat(4,1fr)` ([index.css:164](src/index.css#L164)) — 3 kart için override gerekir. ⚠️ **Inline `style` ile yapılırsa responsive kırılır:** [index.css:609](src/index.css#L609) (`max-width:1100px`) ve [index.css:630](src/index.css#L630) inline stile yenilir. `DailyScreen.tsx:108` bu hatayı zaten taşıyor — kopyalanmamalı. Doğrusu: `index.css`'e `.stat-grid-3` sınıfı eklemek.
+- `.stat-grid` `repeat(4,1fr)` ([index.css:164](src/index.css#L164)) — 3 kart için override gerekir. ⚠️ **Inline `style` ile yapılırsa responsive kırılır:** [index.css:609](src/index.css#L609) (`max-width:1100px`) ve [index.css:630](src/index.css#L630) inline stile yenilir. Doğrusu: `index.css`'e `.stat-grid-3` sınıfı eklemek — **uygulandı**. (Bu hatanın örneği `DailyScreen.tsx:108`'di; o ekran çizelge sadeleştirmesinde kaldırıldı.)
 - Tasarımın hex'leri yerine **token**: `#10b981`→`--came-dot`, `#e2e8f0`→`--border`, `#047857`→`--came-fg`, `#b45309`→`--late-fg`.
 - **Arama alanları:** personel `name` + `role`. `toLocaleLowerCase('tr')` **iki tarafta** (aksi halde `İş`/`iş` eşleşmez).
 - `fetchOnboardings()` `.is('archived_at', null)` filtreliyor.
@@ -349,7 +357,7 @@ Yalnız açık süreçler gösterildiği için tasarımın sekmeleri ve `Durum` 
 
 ### Detay modal
 
-`Dialog width={980}`, gövde `gridTemplateColumns: '1fr 320px'` (sağ ray), 900px altında tek kolona iner.
+`Dialog width={980}`, gövde `.dialog-body-rail` sınıfı (`1fr 320px`, sağ ray), **760px** altında tek kolona iner ([index.css:629](src/index.css#L629)). ⚠️ Plan başta inline `gridTemplateColumns` diyordu; inline stil o medya sorgusunu ezerdi — `.stat-grid-3`'teki aynı tuzak.
 
 **İki kaynağı birlikte çeker.** Listeden gelen satır bir `Onboarding` — view'dan geldiği için `phone`/`iban`/`notes` içermiyor:
 
@@ -495,6 +503,23 @@ Her sprint sonunda `npm run build` temiz geçmeli.
 12. **Arşivden geri dönüş yolu yok.** Yanlışlıkla tamamlanan bir süreç ancak SQL ile geri alınabilir (`update onboardings set archived_at = null where id = ?`).
 
 ---
+
+## Uygulama sırasında ortaya çıkan sapmalar
+
+Plan yazıldıktan sonra değişen veya plandaki hâliyle yanlış olacak kararlar:
+
+| Konu | Planda | Uygulanan | Sebep |
+|---|---|---|---|
+| Sağ ray düzeni | inline `gridTemplateColumns` | `.dialog-body-rail` sınıfı | Inline stil [index.css:629](src/index.css#L629)'daki 760px medya sorgusunu ezerdi. Plan ayrıca kırılma noktasını 900px sanıyordu. |
+| Stat kartı düzeni | inline override | `.stat-grid-3` sınıfı | Aynı tuzak; 1100px ve 540px sorguları ezilirdi. |
+| `fetchOnboardings` | düz `.select('*')` | `fetchAllRows` ile sayfalanıyor | PostgREST 1000 satırda sessizce kırpıyor, hata vermiyor. |
+| Evrak Tanımları'nda Escape | belirtilmemiş | satır içi eklemede `stopPropagation` | `Dialog` dinleyicisi `document`'te; aksi halde tek Escape hem eklemeyi iptal eder hem modalı kapatırdı. |
+| `add_onboarding_doc_def` | `set is_active = true` | `+ description = excluded.description` | Kaldırılan bir evrak düzeltilmiş açıklamayla tekrar eklenince eski açıklama kalıyordu. |
+| RPC dönüş tipi | `returns bigint` | `returns table(onboarding_id, employee_id)` | `employee_id` olmadan yeni personel istemci state'ine giremiyor; liste satırı ve detay boş render ediyordu. |
+| `Dialog` Escape düzeltmesi | S3'ün içinde | ayrı commit (`2ec21e4`) | Bu özelliğe bağlı değildi — mevcut bir bug'dı; planın en riskli maddesi öne çekildi. |
+| `Select` `disabled` | "Şube seçilene kadar Departman pasif" | düştü | `Select` böyle bir prop tanımlamıyor; ayrıca `stations`/`departments` arasında veri bağımlılığı yok. |
+
+Ayrıca plan yazıldıktan sonra `main`'de Raporlar, Günlük Kontrol ve haftalık çizelge görünümü kaldırıldı; `shifts.status` kolonu düşürüldü. Dal `efa54bd` ile güncellendi — o merge olmadan bu dalda vardiya ekleme PGRST204 verirdi.
 
 ## Kritik dosyalar
 

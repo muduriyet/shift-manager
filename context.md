@@ -73,6 +73,34 @@ Satış Dashboard ayrı tablolar ve view'lar kullanır; vardiya tablolarını de
 
 `apply_sales_import(payload jsonb)` RPC tek transaction içinde günlük satış raporunu insert/update eder, audit kaydı oluşturur ve `last_import_run_id` alanını günceller.
 
+### İşe Giriş tabloları
+
+Yeni personelin işe alım sürecini takip eder. Mevcut hiçbir tabloyu değiştirmez;
+`employees` ve `profiles`'a yalnız FK ile bağlanır.
+
+| Tablo / View | Amaç |
+|---|---|
+| `onboarding_doc_defs` | Evrak kataloğu (şablon). `doc_set`: `personel` (6) / `giris` (2) / `asil` (9). Silme yerine `is_active=false`. |
+| `onboardings` | Sürecin kendisi. `stage` = **ulaşılan** kilometre taşı (1 mail atıldı · 2 SGK yapıldı · 3 asıllar geldi). `phone`/`iban`/`notes` bilinçli olarak burada, `employees`'te değil. Bir personelin aynı anda tek açık süreci olabilir (kısmi unique index, `where archived_at is null`). |
+| `onboarding_docs` | Sürece **kopyalanmış** evrak satırları. Katalogdan bağımsız yaşar: katalog değişikliği arşivlenmiş süreçleri etkileyemez. |
+| `onboarding_list_view` | Liste ekranını tek sorguda besler: süreç alanları + altı sayaç. `phone`/`iban`/`notes` **taşımaz** — liste tüm açık süreçleri çektiği için IBAN toplu hâlde belleğe inmesin diye. |
+
+`seed_onboarding_docs()` trigger'ı süreç açılınca katalogdaki aktif satırları
+aynı transaction içinde kopyalar; evraksız süreç oluşamaz.
+
+`create_onboarding_with_employee(...)` RPC personel + süreci tek transaction'da
+yazar ve **hem `onboarding_id` hem `employee_id`** döndürür (ikincisi olmadan
+yeni personel istemci state'ine giremez).
+
+`add_onboarding_doc_def(...)` RPC tanımı yazar **ve devam eden süreçlere yayar**.
+Kaldırma yaymaz: mevcut süreçlerdeki kopyalar ve işaretleri korunur, tanım yalnız
+bundan sonra açılacak süreçlerde görünmez. Asimetri kasıtlı — her iki yön de veri
+kaybetmeyen tarafı seçiyor.
+
+`stage >= 3` tamamlanma demektir; evrak tikleri bilgi amaçlıdır. Tamamlanan süreç
+detay modalı kapanırken arşivlenir (anında değil — kullanıcı modal içindeyken
+serbestçe düzeltebilmeli).
+
 ---
 
 ## Temel Kurallar

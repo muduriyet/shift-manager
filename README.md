@@ -70,6 +70,7 @@ npm run dev
 | Vardiya Çizelgesi | Aylık planlama grid'i + Excel içe/dışa aktarım |
 | Personel Listesi | Personel CRUD, işe giriş/çıkış tarihleri, soft delete (Aktif/Pasif filtre) |
 | Görev Defteri | Ekip görev/rutin takibi, yorum ve ek dosya + Excel export |
+| İşe Giriş Süreçleri | Yeni personelin 3 aşamalı işe alım takibi; 17 kalemlik evrak kontrol listesi, süreç açma ve arşivleme |
 | Satış Dashboard | Günlük/özet satış Excel import'u, import konfigürasyonu, KPI/grafikler ve veri gezgini |
 | Ayarlar | İstasyon, departman, görev ekle/sil ve vardiya saatleri |
 
