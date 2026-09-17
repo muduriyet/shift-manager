@@ -101,11 +101,20 @@ export const STEP_BADGE: Record<StepStatus, { label: string; status: string; dot
 };
 
 // ---- Tarih ----
-// Tasarımdaki gg.aa.yyyy. slice(0,10) hem 'YYYY-MM-DD' hem ISO timestamp'i karşılar.
+// Tasarımdaki gg.aa.yyyy. İki girdi biçimi gelir ve AYRI ele alınmalı:
+//   'YYYY-MM-DD' ('date' kolonu) — doğrudan Date'e verilirse UTC gece yarısı
+//     sayılır; saat dilimine göre gün kayabilir, o yüzden yerel gece yarısına
+//     sabitleniyor ('T00:00:00').
+//   ISO timestamp ('timestamptz') — offset taşır, yerel güne çevrilmeli. Ham
+//     string UTC gününü gösterir: Istanbul'da 00:41'de oluşan kayıt bir önceki
+//     gün görünürdü (QA turu 1).
+// Ayrım çağırana bırakılamaz: TS tarafında ikisi de `string`.
 export function fmtDMY(value: string | null): string {
   if (!value) return '—';
-  const [y, m, d] = value.slice(0, 10).split('-');
-  return `${d}.${m}.${y}`;
+  const d = new Date(value.includes('T') ? value : value.slice(0, 10) + 'T00:00:00');
+  if (Number.isNaN(d.getTime())) return '—';
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()}`;
 }
 
 // ---- Arama ----
