@@ -169,10 +169,15 @@ function toShift(r: ShiftRow): Shift {
 
 // ---- Employees ----
 
+// Sayfalı: personel listesi giriş anında komple belleğe alınıyor ve kırpılırsa
+// bağlı olduğu her ekran (çizelge, süreç listesi, Excel eşleştirme) satır
+// kaybeder. 1000 satır bugün uzak ama sessiz kırpılma fark edilmesi zor bir
+// hata sınıfı — QA turu 1.
 export async function fetchEmployees(): Promise<Employee[]> {
-  const { data, error } = await supabase().from('employees').select(EMP_SELECT).order('id');
-  if (error) throw error;
-  return (data as unknown as EmpRow[]).map(toEmployee);
+  const rows = await fetchAllRows<EmpRow>(
+    () => supabase().from('employees').select(EMP_SELECT).order('id'),
+  );
+  return rows.map(toEmployee);
 }
 
 export async function createEmployee(form: {
