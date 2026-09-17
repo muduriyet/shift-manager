@@ -189,6 +189,34 @@ end; $$;
 
 grant execute on function public.add_onboarding_doc_def(text, text, text) to authenticated;
 
+-- ---- RPC: personel bilgilerini kaydet (ad + iletişim) ----
+-- Ad employees'te, telefon/IBAN onboardings'te; kullanıcı için tek form.
+-- İki ayrı yazma yapılıyordu ve ikincisi patlarsa ad değişmiş olmasına rağmen
+-- "kaydedilemedi" deniyordu (QA turu 1). Tek fonksiyon = tek transaction:
+-- ikinci UPDATE hata verirse birincisi de geri alınır.
+
+create or replace function public.save_onboarding_person(
+  p_onboarding_id bigint, p_employee_id bigint,
+  p_name text, p_phone text, p_iban text
+) returns void
+  language plpgsql security invoker set search_path = public, pg_temp as $$
+begin
+  update public.onboardings
+     set phone = coalesce(p_phone, ''), iban = coalesce(p_iban, '')
+   where id = p_onboarding_id and employee_id = p_employee_id;
+  if not found then
+    raise exception 'Süreç bulunamadı veya personel eşleşmiyor (onboarding=%, employee=%)',
+      p_onboarding_id, p_employee_id;
+  end if;
+
+  update public.employees set name = p_name where id = p_employee_id;
+  if not found then
+    raise exception 'Personel bulunamadı (id=%)', p_employee_id;
+  end if;
+end; $$;
+
+grant execute on function public.save_onboarding_person(bigint, bigint, text, text, text) to authenticated;
+
 -- ---- Liste görünümü ----
 -- security_invoker: view'ı sorgulayan rolün RLS'i uygulanır (definer değil).
 -- phone/iban/notes BİLİNÇLİ olarak yok: liste tüm açık süreçleri çekiyor,
@@ -240,6 +268,7 @@ create policy "Authenticated full access" on onboarding_docs     for all to auth
 --   drop view     if exists onboarding_list_view;
 --   drop function if exists public.create_onboarding_with_employee(text,integer,integer,integer,date,uuid);
 --   drop function if exists public.add_onboarding_doc_def(text,text,text);
+--   drop function if exists public.save_onboarding_person(bigint,bigint,text,text,text);
 --   drop function if exists public.seed_onboarding_docs();
 --   drop table    if exists onboarding_docs, onboardings, onboarding_doc_defs;
 --

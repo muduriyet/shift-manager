@@ -4,8 +4,8 @@ import type {
   Onboarding, OnboardingDoc, OnboardingStage,
 } from '../../types';
 import {
-  fetchOnboarding, fetchOnboardingDocs, setOnboardingContact, setOnboardingDocDone,
-  setOnboardingNotes, setOnboardingStage, updateEmployeeAssignment, updateEmployeeName,
+  fetchEmployee, fetchOnboarding, fetchOnboardingDocs, saveOnboardingPerson,
+  setOnboardingDocDone, setOnboardingNotes, setOnboardingStage, updateEmployeeAssignment,
 } from '../../lib/db';
 import { DOC_SETS, STAGES, STEP_BADGE, fmtDMY, isComplete, stepStatus } from '../../lib/onboarding';
 import { Dialog } from '../ui/Dialog';
@@ -464,17 +464,23 @@ export function OnboardingModal({
           iban={iban}
           onCancel={() => setDuzenleme(null)}
           onSave={async (form) => {
+            // Ad employees'e, telefon/IBAN onboardings'e — kullanıcı için tek form,
+            // veritabanında tek transaction.
             try {
-              // Ad employees'e, telefon/IBAN onboardings'e — kullanıcı için tek form.
-              if (form.name !== employee.name) {
-                onEmployeeSaved(await updateEmployeeName(employee.id, form.name));
-              }
-              await setOnboardingContact(process.id, { phone: form.phone, iban: form.iban });
-              setPhone(form.phone); setIban(form.iban);
-              setDuzenleme(null);
+              await saveOnboardingPerson(process.id, employee.id, form);
             } catch (err) {
               console.error('Personel bilgileri kaydedilemedi', err);
               onToast('Personel bilgileri kaydedilemedi');
+              return;
+            }
+            // Yazma bitti; buradan sonrası yalnız App state tazeleme. Aynı try'a
+            // konsaydı fetchEmployee'nin hatası kullanıcıya "kaydedilemedi" der
+            // ve az önce kapattığımız hatanın aynısı bir katman yukarıda çıkardı.
+            setPhone(form.phone); setIban(form.iban);
+            setDuzenleme(null);
+            if (form.name !== employee.name) {
+              try { onEmployeeSaved(await fetchEmployee(employee.id)); }
+              catch (err) { console.error('Personel state tazelenemedi', err); }
             }
           }}
         />
