@@ -90,12 +90,16 @@ function Stepper({
 
 // ---- Evrak tablosu ----
 function DocTable({
-  setId, docs, onToggle, tamamlandiSatiri,
+  setId, docs, onToggle, tamamlandiSatiri, surecTamam,
 }: {
   setId: 'personel' | 'giris' | 'asil';
   docs: OnboardingDoc[];
   onToggle: (doc: OnboardingDoc, done: boolean) => void;
+  // Yalnız 'asil' tablosunda: tüm asıllar geldi mi (yeşil satırı sürer).
   tamamlandiSatiri?: boolean;
+  // Süreç 3. aşamada mı. Satırın METNİNİ belirler: asılların gelmesi tek
+  // başına süreci bitirmez (bkz. isComplete), o yüzden ikisi ayrı.
+  surecTamam?: boolean;
 }) {
   const def = DOC_SETS.find(s => s.id === setId)!;
   const satirlar = docs.filter(d => d.docSet === setId);
@@ -177,7 +181,9 @@ function DocTable({
           }}
         >
           <Icon name="check" size={16} />
-          Tüm evrak asılları teslim alındı — süreç tamamlandı.
+          {surecTamam
+            ? 'Tüm evrak asılları teslim alındı — süreç tamamlandı.'
+            : 'Tüm evrak asılları teslim alındı — 3. adımı işaretleyin.'}
         </div>
       )}
     </div>
@@ -346,7 +352,7 @@ export function OnboardingModal({
               <>
                 <DocTable setId="personel" docs={docs} onToggle={toggleDoc} />
                 <DocTable setId="giris" docs={docs} onToggle={toggleDoc} />
-                <DocTable setId="asil" docs={docs} onToggle={toggleDoc} tamamlandiSatiri={hepsiGeldi} />
+                <DocTable setId="asil" docs={docs} onToggle={toggleDoc} tamamlandiSatiri={hepsiGeldi} surecTamam={tamam} />
               </>
             )}
           </div>

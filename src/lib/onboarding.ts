@@ -46,10 +46,6 @@ export const DOC_SETS: readonly DocSetDef[] = [
   { id: 'asil',     stage: 3, title: 'Evrak Aslı',     doneCol: 'Evrak Adı', notDoneCol: 'Gelmedi',      doneLabel: 'Geldi',      notDoneLabel: 'Gelmedi' },
 ] as const;
 
-export function docSetDef(id: OnboardingDocSet): DocSetDef {
-  return DOC_SETS.find(s => s.id === id) ?? DOC_SETS[0];
-}
-
 // Sürecin bulunduğu aşamada toplanan set.
 export function activeDocSet(stage: OnboardingStage): DocSetDef {
   return DOC_SETS[stage - 1];
@@ -67,12 +63,6 @@ export function docCount(o: Onboarding, set: OnboardingDocSet): { done: number; 
 export function activeDocCount(o: Onboarding): { done: number; total: number; set: DocSetDef } {
   const set = activeDocSet(o.stage);
   return { ...docCount(o, set.id), set };
-}
-
-// Tüm asıllar geldi mi? Tamamlanmayı BELİRLEMEZ (bkz. isComplete); yalnız
-// Evrak Aslı kartının altındaki yeşil "hepsi teslim alındı" satırını sürer.
-export function allOriginalsReceived(o: Onboarding): boolean {
-  return o.asilTotal > 0 && o.asilDone === o.asilTotal;
 }
 
 // ---- Tamamlanma ----
