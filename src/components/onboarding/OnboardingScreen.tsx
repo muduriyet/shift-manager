@@ -1,6 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Employee, Station, Department, Role, Profile, Onboarding } from '../../types';
-import { archiveOnboarding, createOnboardingWithEmployee, fetchEmployee, fetchOnboardings } from '../../lib/db';
+import {
+  archiveOnboarding, archiveOnboardingIfComplete, createOnboardingWithEmployee,
+  fetchEmployee, fetchOnboardings,
+} from '../../lib/db';
 import { activeDocCount, fmtDMY, stageDef, trLower } from '../../lib/onboarding';
 import { OnboardingModal } from '../modals/OnboardingModal';
 import { OnboardingCreateModal, type OnboardingCreateForm } from '../modals/OnboardingCreateModal';
@@ -131,7 +134,11 @@ export function OnboardingScreen({
     setOpenId(null);
     if (id != null && finalStage >= 3) {
       try {
-        await archiveOnboarding(id);
+        // false = aşama 3 olarak yazılamamış; süreç bilerek açık bırakılıyor.
+        // Sessiz kalmasın, yoksa kullanıcı tamamlandı sanıp listede görür.
+        if (!await archiveOnboardingIfComplete(id)) {
+          onToast('Aşama kaydedilmedi, süreç açık kaldı');
+        }
       } catch (err) {
         console.error('Süreç arşivlenemedi', err);
         onToast('Süreç arşivlenemedi');
@@ -141,6 +148,45 @@ export function OnboardingScreen({
   }
 
   const empById = useMemo(() => new Map(employees.map(e => [e.id, e])), [employees]);
+
+  // Eksik personel kaydını kendi kendine tamamla.
+  // employees App state'ine giriş anında bir kez yükleniyor. Başka sekmede
+  // (veya başka kullanıcıda) açılan sürecin personeli bu sekmede yok; satır
+  // aşağıdaki joined'da eleniyor ama sayaçlar filtrelenmemiş list'ten geldiği
+  // için "Toplam 3" yazıp tabloda 2 satır görünüyordu (QA turu 1).
+  //
+  // onEmployeeSaved App.tsx'te satır içi arrow — her render'da yeni kimlik.
+  // Bağımlılığa konsaydı effect her render'da koşardı, o yüzden ref üzerinden.
+  const onEmployeeSavedRef = useRef(onEmployeeSaved);
+  onEmployeeSavedRef.current = onEmployeeSaved;
+
+  // Denenen id'ler: employees dizisi alakasız bir sebeple değişince effect
+  // yeniden koşuyor ve aynı id ikinci kez çekilirdi.
+  const denenen = useRef<Set<number>>(new Set());
+
+  useEffect(() => {
+    const eksik = [...new Set(list.map(o => o.employeeId))]
+      .filter(id => !empById.has(id) && !denenen.current.has(id));
+    if (eksik.length === 0) return;
+    eksik.forEach(id => denenen.current.add(id));
+
+    let alive = true;
+    (async () => {
+      for (const id of eksik) {
+        if (!alive) break;          // ekran kapandıysa kalanları çekme
+        try {
+          const emp = await fetchEmployee(id);
+          if (alive) onEmployeeSavedRef.current(emp);
+        } catch (err) {
+          // Sessiz bırakılırsa sayaç/satır uyuşmazlığı geri gelir ve sebebi
+          // görünmez olur. Bir sonraki reload tekrar denesin diye işareti kaldır.
+          denenen.current.delete(id);
+          console.error('Süreçteki personel çekilemedi', id, err);
+        }
+      }
+    })();
+    return () => { alive = false; };
+  }, [list, empById]);
 
   // View personel bilgisi taşımıyor; ad/pozisyon/şube/başlangıç App'ten gelen
   // employees dizisinden eşleştiriliyor (fetchEmployees filtresiz, hepsi yüklü).

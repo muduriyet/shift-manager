@@ -46,10 +46,6 @@ export const DOC_SETS: readonly DocSetDef[] = [
   { id: 'asil',     stage: 3, title: 'Evrak Aslı',     doneCol: 'Evrak Adı', notDoneCol: 'Gelmedi',      doneLabel: 'Geldi',      notDoneLabel: 'Gelmedi' },
 ] as const;
 
-export function docSetDef(id: OnboardingDocSet): DocSetDef {
-  return DOC_SETS.find(s => s.id === id) ?? DOC_SETS[0];
-}
-
 // Sürecin bulunduğu aşamada toplanan set.
 export function activeDocSet(stage: OnboardingStage): DocSetDef {
   return DOC_SETS[stage - 1];
@@ -67,12 +63,6 @@ export function docCount(o: Onboarding, set: OnboardingDocSet): { done: number; 
 export function activeDocCount(o: Onboarding): { done: number; total: number; set: DocSetDef } {
   const set = activeDocSet(o.stage);
   return { ...docCount(o, set.id), set };
-}
-
-// Tüm asıllar geldi mi? Tamamlanmayı BELİRLEMEZ (bkz. isComplete); yalnız
-// Evrak Aslı kartının altındaki yeşil "hepsi teslim alındı" satırını sürer.
-export function allOriginalsReceived(o: Onboarding): boolean {
-  return o.asilTotal > 0 && o.asilDone === o.asilTotal;
 }
 
 // ---- Tamamlanma ----
@@ -101,11 +91,20 @@ export const STEP_BADGE: Record<StepStatus, { label: string; status: string; dot
 };
 
 // ---- Tarih ----
-// Tasarımdaki gg.aa.yyyy. slice(0,10) hem 'YYYY-MM-DD' hem ISO timestamp'i karşılar.
+// Tasarımdaki gg.aa.yyyy. İki girdi biçimi gelir ve AYRI ele alınmalı:
+//   'YYYY-MM-DD' ('date' kolonu) — doğrudan Date'e verilirse UTC gece yarısı
+//     sayılır; saat dilimine göre gün kayabilir, o yüzden yerel gece yarısına
+//     sabitleniyor ('T00:00:00').
+//   ISO timestamp ('timestamptz') — offset taşır, yerel güne çevrilmeli. Ham
+//     string UTC gününü gösterir: Istanbul'da 00:41'de oluşan kayıt bir önceki
+//     gün görünürdü (QA turu 1).
+// Ayrım çağırana bırakılamaz: TS tarafında ikisi de `string`.
 export function fmtDMY(value: string | null): string {
   if (!value) return '—';
-  const [y, m, d] = value.slice(0, 10).split('-');
-  return `${d}.${m}.${y}`;
+  const d = new Date(value.includes('T') ? value : value.slice(0, 10) + 'T00:00:00');
+  if (Number.isNaN(d.getTime())) return '—';
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()}`;
 }
 
 // ---- Arama ----

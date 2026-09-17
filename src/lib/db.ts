@@ -169,10 +169,15 @@ function toShift(r: ShiftRow): Shift {
 
 // ---- Employees ----
 
+// Sayfalı: personel listesi giriş anında komple belleğe alınıyor ve kırpılırsa
+// bağlı olduğu her ekran (çizelge, süreç listesi, Excel eşleştirme) satır
+// kaybeder. 1000 satır bugün uzak ama sessiz kırpılma fark edilmesi zor bir
+// hata sınıfı — QA turu 1.
 export async function fetchEmployees(): Promise<Employee[]> {
-  const { data, error } = await supabase().from('employees').select(EMP_SELECT).order('id');
-  if (error) throw error;
-  return (data as unknown as EmpRow[]).map(toEmployee);
+  const rows = await fetchAllRows<EmpRow>(
+    () => supabase().from('employees').select(EMP_SELECT).order('id'),
+  );
+  return rows.map(toEmployee);
 }
 
 export async function createEmployee(form: {
@@ -969,13 +974,6 @@ export async function fetchEmployee(id: number): Promise<Employee> {
   return toEmployee(data as unknown as EmpRow);
 }
 
-export async function updateEmployeeName(id: number, name: string): Promise<Employee> {
-  const { data, error } = await supabase()
-    .from('employees').update({ name }).eq('id', id).select(EMP_SELECT).single();
-  if (error) throw error;
-  return toEmployee(data as unknown as EmpRow);
-}
-
 export async function updateEmployeeAssignment(
   id: number,
   form: { stationId: number; deptId: number; roleId: number; startDate: string | null },
@@ -1144,11 +1142,20 @@ export async function setOnboardingStage(id: number, stage: OnboardingStage): Pr
   if (error) throw error;
 }
 
-export async function setOnboardingContact(
-  id: number, form: { phone: string; iban: string },
+// Ad employees'te, telefon/IBAN onboardings'te — ama kullanıcı için tek form.
+// İkisi ayrı yazılırsa ikincisi patladığında ad değişmiş olur ve kullanıcı
+// "kaydedilemedi" görür (QA turu 1). RPC ikisini tek transaction'da yazıyor.
+export async function saveOnboardingPerson(
+  onboardingId: number, employeeId: number,
+  form: { name: string; phone: string; iban: string },
 ): Promise<void> {
-  const { error } = await supabase()
-    .from('onboardings').update({ phone: form.phone, iban: form.iban }).eq('id', id);
+  const { error } = await supabase().rpc('save_onboarding_person', {
+    p_onboarding_id: onboardingId,
+    p_employee_id:   employeeId,
+    p_name:          form.name,
+    p_phone:         form.phone,
+    p_iban:          form.iban,
+  });
   if (error) throw error;
 }
 
@@ -1162,7 +1169,24 @@ export async function setOnboardingDocDone(docId: number, done: boolean): Promis
   if (error) throw error;
 }
 
-// Soft delete: tamamlanan (veya iptal edilen) süreç listeden düşer, kayıt kalır.
+// Otomatik arşivleme (modal kapanışı). Koşul UPDATE'in İÇİNDE, çünkü istemcinin
+// aşama değeri iyimser: kullanıcı 3. adıma tıklayıp modalı hemen kapatırsa
+// aşama yazımı 500 dönmüş olsa bile kapanış onu 3 sanar ve süreç listeden
+// düşerdi — UI'dan geri dönüşü olmayan bir kayıp (QA turu 1).
+// .eq('stage', 3) bu yüzden silinmemeli: yazım başarısızsa (veya henüz
+// uçuştaysa) satırın stage'i 3 değildir, 0 satır eşleşir, arşivleme olmaz.
+export async function archiveOnboardingIfComplete(id: number): Promise<boolean> {
+  const { data, error } = await supabase()
+    .from('onboardings')
+    .update({ archived_at: new Date().toISOString() })
+    .eq('id', id).eq('stage', 3).is('archived_at', null)
+    .select('id');
+  if (error) throw error;
+  return (data ?? []).length > 0;
+}
+
+// Elle iptal: koşulsuz, çünkü tamamlanmadan vazgeçilen süreç her aşamada
+// arşivlenebilmeli.
 export async function archiveOnboarding(id: number): Promise<void> {
   const { error } = await supabase()
     .from('onboardings').update({ archived_at: new Date().toISOString() }).eq('id', id);

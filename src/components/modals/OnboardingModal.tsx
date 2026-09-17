@@ -4,8 +4,8 @@ import type {
   Onboarding, OnboardingDoc, OnboardingStage,
 } from '../../types';
 import {
-  fetchOnboarding, fetchOnboardingDocs, setOnboardingContact, setOnboardingDocDone,
-  setOnboardingNotes, setOnboardingStage, updateEmployeeAssignment, updateEmployeeName,
+  fetchEmployee, fetchOnboarding, fetchOnboardingDocs, saveOnboardingPerson,
+  setOnboardingDocDone, setOnboardingNotes, setOnboardingStage, updateEmployeeAssignment,
 } from '../../lib/db';
 import { DOC_SETS, STAGES, STEP_BADGE, fmtDMY, isComplete, stepStatus } from '../../lib/onboarding';
 import { Dialog } from '../ui/Dialog';
@@ -34,10 +34,13 @@ interface OnboardingModalProps {
 
 // ---- Stepper ----
 function Stepper({
-  stage, tamam, onPick,
+  stage, tamam, saving, onPick,
 }: {
   stage: OnboardingStage;
   tamam: boolean;
+  // Aşama yazımı uçuştayken tıklamalar yutuluyor; buton da devre dışı olmalı
+  // ki kullanıcı "tıkladım ama hiçbir şey olmadı" durumunda kalmasın.
+  saving: boolean;
   onPick: (k: OnboardingStage) => void;
 }) {
   const sahte = { stage } as Onboarding;
@@ -69,10 +72,12 @@ function Stepper({
             <button
               type="button"
               onClick={() => onPick(s.n)}
-              title={`${s.n}. adıma al`}
+              disabled={saving}
+              title={saving ? 'Kaydediliyor…' : `${s.n}. adıma al`}
               style={{
                 width: 52, height: 52, borderRadius: '50%', display: 'grid', placeItems: 'center',
-                position: 'relative', zIndex: 1, cursor: 'pointer', padding: 0, ...daire,
+                position: 'relative', zIndex: 1, padding: 0,
+                cursor: saving ? 'default' : 'pointer', ...daire,
               }}
             >
               <Icon name={s.icon} size={22} />
@@ -90,12 +95,16 @@ function Stepper({
 
 // ---- Evrak tablosu ----
 function DocTable({
-  setId, docs, onToggle, tamamlandiSatiri,
+  setId, docs, onToggle, tamamlandiSatiri, surecTamam,
 }: {
   setId: 'personel' | 'giris' | 'asil';
   docs: OnboardingDoc[];
   onToggle: (doc: OnboardingDoc, done: boolean) => void;
+  // Yalnız 'asil' tablosunda: tüm asıllar geldi mi (yeşil satırı sürer).
   tamamlandiSatiri?: boolean;
+  // Süreç 3. aşamada mı. Satırın METNİNİ belirler: asılların gelmesi tek
+  // başına süreci bitirmez (bkz. isComplete), o yüzden ikisi ayrı.
+  surecTamam?: boolean;
 }) {
   const def = DOC_SETS.find(s => s.id === setId)!;
   const satirlar = docs.filter(d => d.docSet === setId);
@@ -177,7 +186,9 @@ function DocTable({
           }}
         >
           <Icon name="check" size={16} />
-          Tüm evrak asılları teslim alındı — süreç tamamlandı.
+          {surecTamam
+            ? 'Tüm evrak asılları teslim alındı — süreç tamamlandı.'
+            : 'Tüm evrak asılları teslim alındı — 3. adımı işaretleyin.'}
         </div>
       )}
     </div>
@@ -213,6 +224,7 @@ export function OnboardingModal({
   onEmployeeSaved, onToast, onClose, onArchive,
 }: OnboardingModalProps) {
   const [stage, setStage] = useState<OnboardingStage>(process.stage);
+  const [stageSaving, setStageSaving] = useState(false);
   const [docs, setDocs] = useState<OnboardingDoc[]>([]);
   const [phone, setPhone] = useState('');
   const [iban, setIban] = useState('');
@@ -264,16 +276,22 @@ export function OnboardingModal({
 
   // İleri ve geri serbest. Aşamayı geri almak evrak işaretlerini SİLMEZ —
   // yanlış aşama seçimi veri kaybettirmemeli.
+  //
+  // Tek uçuş: iki aşama yazımı aynı anda uçuşta olursa sıra dışı tamamlanıp
+  // DB'de UI'ın gösterdiğinden başka bir aşama kalabilir (QA turu 1).
   async function pickStage(k: OnboardingStage) {
-    if (k === stage) return;
+    if (k === stage || stageSaving) return;
     const onceki = stage;
     setStage(k);
+    setStageSaving(true);
     try {
       await setOnboardingStage(process.id, k);
     } catch (err) {
       console.error('Aşama güncellenemedi', err);
       setStage(onceki);
       onToast('Aşama güncellenemedi');
+    } finally {
+      setStageSaving(false);
     }
   }
 
@@ -336,7 +354,7 @@ export function OnboardingModal({
               </div>
             </div>
 
-            <Stepper stage={stage} tamam={tamam} onPick={pickStage} />
+            <Stepper stage={stage} tamam={tamam} saving={stageSaving} onPick={pickStage} />
 
             {loading ? (
               <div style={{ padding: 30, textAlign: 'center', color: 'var(--muted-foreground)', fontSize: 13.5 }}>
@@ -346,7 +364,7 @@ export function OnboardingModal({
               <>
                 <DocTable setId="personel" docs={docs} onToggle={toggleDoc} />
                 <DocTable setId="giris" docs={docs} onToggle={toggleDoc} />
-                <DocTable setId="asil" docs={docs} onToggle={toggleDoc} tamamlandiSatiri={hepsiGeldi} />
+                <DocTable setId="asil" docs={docs} onToggle={toggleDoc} tamamlandiSatiri={hepsiGeldi} surecTamam={tamam} />
               </>
             )}
           </div>
@@ -446,17 +464,23 @@ export function OnboardingModal({
           iban={iban}
           onCancel={() => setDuzenleme(null)}
           onSave={async (form) => {
+            // Ad employees'e, telefon/IBAN onboardings'e — kullanıcı için tek form,
+            // veritabanında tek transaction.
             try {
-              // Ad employees'e, telefon/IBAN onboardings'e — kullanıcı için tek form.
-              if (form.name !== employee.name) {
-                onEmployeeSaved(await updateEmployeeName(employee.id, form.name));
-              }
-              await setOnboardingContact(process.id, { phone: form.phone, iban: form.iban });
-              setPhone(form.phone); setIban(form.iban);
-              setDuzenleme(null);
+              await saveOnboardingPerson(process.id, employee.id, form);
             } catch (err) {
               console.error('Personel bilgileri kaydedilemedi', err);
               onToast('Personel bilgileri kaydedilemedi');
+              return;
+            }
+            // Yazma bitti; buradan sonrası yalnız App state tazeleme. Aynı try'a
+            // konsaydı fetchEmployee'nin hatası kullanıcıya "kaydedilemedi" der
+            // ve az önce kapattığımız hatanın aynısı bir katman yukarıda çıkardı.
+            setPhone(form.phone); setIban(form.iban);
+            setDuzenleme(null);
+            if (form.name !== employee.name) {
+              try { onEmployeeSaved(await fetchEmployee(employee.id)); }
+              catch (err) { console.error('Personel state tazelenemedi', err); }
             }
           }}
         />
