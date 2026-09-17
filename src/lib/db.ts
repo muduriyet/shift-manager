@@ -1076,13 +1076,17 @@ function toDocDef(r: OnboardingDocDefRow): OnboardingDocDef {
   };
 }
 
+// fetchAllRows ile sayfalanıyor: PostgREST 1000 satırda sessizce kırpar, hata
+// vermez. Açık süreç sayısının bu eşiği aşması beklenmiyor ama kırpılma
+// fark edilmeyen bir hata sınıfı, tek satırlık sigorta.
 export async function fetchOnboardings(): Promise<Onboarding[]> {
-  const { data, error } = await supabase()
-    .from('onboarding_list_view').select('*')
-    .is('archived_at', null)
-    .order('created_at', { ascending: false });
-  if (error) throw error;
-  return (data as OnboardingRow[]).map(toOnboarding);
+  const rows = await fetchAllRows<OnboardingRow>(
+    () => supabase()
+      .from('onboarding_list_view').select('*')
+      .is('archived_at', null)
+      .order('created_at', { ascending: false }),
+  );
+  return rows.map(toOnboarding);
 }
 
 // Detay modalı: view'da olmayan phone/iban/notes için doğrudan tabloya gider.
