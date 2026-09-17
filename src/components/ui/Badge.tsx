@@ -1,9 +1,8 @@
 import type { ReactNode } from 'react';
 
+// Yalnızca personel durumu (Aktif/Pasif) rozetlenir. Vardiya devam durumu
+// (Planlandı/Geldi/Gelmedi) kavramı kaldırıldığı için o satırlar düştü.
 const STATUS_BADGE: Record<string, string> = {
-  Planlandı:    'badge-plan',
-  Geldi:        'badge-came',
-  Gelmedi:      'badge-absent',
   Aktif:        'badge-active',
   Pasif:        'badge-passive',
 };

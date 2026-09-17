@@ -7,7 +7,6 @@ const NAV: NavItem[] = [
   { id: 'cizelge',    label: 'Çizelge',        icon: 'calendar' },
   { id: 'personeller', label: 'Personel Listesi', icon: 'users' },
   { id: 'gorev',      label: 'Görev Defteri',    icon: 'checkSquare' },
-  { id: 'raporlar',   label: 'Raporlar',         icon: 'chart' },
   { id: 'satis',      label: 'Satış Dashboard',  icon: 'fuel' },
   { id: 'ayarlar',    label: 'Ayarlar',          icon: 'settings' },
 ];

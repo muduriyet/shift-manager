@@ -112,13 +112,12 @@ Satış Dashboard ayrı tablolar ve view'lar kullanır; vardiya tablolarını de
 İstihdam penceresi tek bir kuraldan türetilir: `isWithinEmployment(startDate, endDate, dateStr)`. `start_date` veya `end_date` doluysa:
 - `setCode` ve ShiftModal: aralık dışı tarihe atama yapılamaz (modal validasyonla reddeder)
 - `MonthlyView`: bloke hücreler çizgili gri arka planla gösterilir, pill içeriği gizlenir
-- Haftalık / Günlük / Raporlar: aralık dışı vardiyalar gizlenir ve sayılmaz
 - Tekli seçim uyarısı: picker yerine kırmızı uyarı kutusu açılır; çoklu seçimde bloke hücreler sessizce atlanır
 - **Personel tarihleri güncellendiğinde aralık dışındaki vardiyalar SİLİNMEZ** — DB'de korunur, görünümlerde `isWithinEmployment` ile gizlenir (geçmiş veri kaybı önlendi)
 
 ### Personel Silme (Soft Delete)
 
-Personel fiziksel olarak silinmez; "Pasife Al" ile `is_active = false` yapılır (DB tarafında `shifts.emp_id on delete restrict` ile geçmiş ayrıca korunur). Pasif personel çizelge/günlük/yeni-vardiya akışlarından çıkar ama geçmiş vardiyaları raporlarda görünür. Personel Listesi'nde Aktif/Pasif/Tümü filtresi vardır (varsayılan: Aktif).
+Personel fiziksel olarak silinmez; "Pasife Al" ile `is_active = false` yapılır (DB tarafında `shifts.emp_id on delete restrict` ile geçmiş ayrıca korunur). Pasif personel çizelge ve yeni-vardiya akışlarından çıkar ama geçmiş vardiyaları DB'de korunur. Personel Listesi'nde Aktif/Pasif/Tümü filtresi vardır (varsayılan: Aktif).
 
 ---
 

@@ -45,7 +45,6 @@ export interface ScheduleImportAction {
   dateStr: string;
   existing?: Shift;
   code?: ImportCode;
-  statusPreserved?: boolean;
 }
 
 export interface ScheduleImportPlan {
@@ -61,8 +60,8 @@ export interface ScheduleImportPlan {
   formatErrors: string[];
   warnings: string[];
   existingCount: number;
-  statusPreservedCount: number;
-  resetStatusCount: number;
+  /** Excel'deki kod mevcut kayıtla aynı olan hücre sayısı (aksiyon üretilmez). */
+  unchangedCellCount: number;
   /**
    * Import hiçbir kayıt oluşturmuyor/güncellemiyor, yalnızca siliyor. Yanlışlıkla
    * boş bir şablon yüklemenin tipik sonucu budur, o yüzden ayrı bir onay ister.
@@ -84,8 +83,7 @@ export interface ScheduleImportApplyResult {
   updated: number;
   deleted: number;
   failed: number;
-  statusPreserved: number;
-  resetToPlanned: number;
+  unchangedCells: number;
   skippedNames: string[];
   errors: string[];
 }
@@ -426,8 +424,7 @@ function buildPlanFromRows(
   const existingShifts = scopedMonthShifts(shifts, employees, scope);
   const existingByCell = new Map(existingShifts.map(s => [shiftKey(s.empId, s.shiftDate), s]));
   const actions: ScheduleImportAction[] = [];
-  let statusPreservedCount = 0;
-  let resetStatusCount = 0;
+  let unchangedCellCount = 0;
   let ozPreservedCount = 0;
 
   // Dosya hiç okunamadıysa ya da düzeni tanınmadıysa aksiyon üretilmez.
@@ -461,11 +458,10 @@ function buildPlanFromRows(
       }
 
       if (existing.code === desiredCode) {
-        statusPreservedCount += 1;
+        unchangedCellCount += 1;
         return;
       }
 
-      resetStatusCount += 1;
       actions.push({ kind: 'update', emp, dateStr, existing, code: desiredCode });
     });
   });
@@ -509,8 +505,7 @@ function buildPlanFromRows(
     formatErrors,
     warnings,
     existingCount: existingShifts.length,
-    statusPreservedCount,
-    resetStatusCount,
+    unchangedCellCount,
     deleteOnly,
     noCodesInSheet,
     summary,

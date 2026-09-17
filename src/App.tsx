@@ -20,7 +20,6 @@ import { LoginScreen } from './components/auth/LoginScreen';
 import { Sidebar, TopbarMobile, ToastStack } from './components/layout/Sidebar';
 import { ScheduleScreen } from './components/schedule/ScheduleScreen';
 import { EmployeesScreen } from './components/employees/EmployeesScreen';
-import { ReportsScreen } from './components/reports/ReportsScreen';
 import { SettingsScreen } from './components/settings/SettingsScreen';
 import { TaskNotebookScreen } from './components/tasks/TaskNotebookScreen';
 import { TaskModal } from './components/modals/TaskModal';
@@ -66,7 +65,7 @@ interface EmployeeFormData {
 }
 
 const DEFAULT_VIEW: ViewId = 'cizelge';
-const VIEW_IDS: readonly ViewId[] = ['cizelge', 'personeller', 'gorev', 'raporlar', 'ayarlar', 'satis'];
+const VIEW_IDS: readonly ViewId[] = ['cizelge', 'personeller', 'gorev', 'ayarlar', 'satis'];
 
 function isViewId(value: string | null): value is ViewId {
   return value !== null && (VIEW_IDS as readonly string[]).includes(value);
@@ -490,8 +489,7 @@ export default function App() {
       updated: 0,
       deleted: 0,
       failed: 0,
-      statusPreserved: plan.statusPreservedCount,
-      resetToPlanned: 0,
+      unchangedCells: plan.unchangedCellCount,
       skippedNames: plan.unmatchedNames,
       errors: [],
     };
@@ -529,7 +527,6 @@ export default function App() {
       result.created = createCount;
       result.updated = updateCount;
       result.deleted = applied.deleted;
-      result.resetToPlanned = updateCount;
     } catch (err) {
       // Transaction geri alındığı için kısmi yazma yok: hiçbiri uygulanmadı.
       console.error('Schedule import failed', err);
@@ -639,18 +636,6 @@ export default function App() {
           onToggleDone={handleToggleTaskDone}
           onAdd={() => { setTaskToEdit(null); setTaskModalOpen(true); }}
           onEdit={t => { setTaskToEdit(t); setTaskModalOpen(true); }}
-        />
-      );
-      break;
-    case 'raporlar':
-      screen = (
-        <ReportsScreen
-          employees={employees}
-          shifts={shifts}
-          stationNames={stationNames}
-          deptNames={deptNames}
-          ensureMonths={ensureMonths}
-          isMonthPending={isMonthPending}
         />
       );
       break;

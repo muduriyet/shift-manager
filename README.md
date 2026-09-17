@@ -2,7 +2,7 @@
 
 İki istasyonlu (Ümraniye, Şile), her istasyonda iki departmanlı (Akaryakıt, Market) bir akaryakıt işletmesi için Türkçe operasyon uygulaması.
 
-Uygulama vardiya çizelgesi, personel yönetimi, günlük devam kontrolü, raporlar ve akaryakıt satış dashboard'unu tek arayüzde toplar. Giriş Supabase Auth üzerinden kullanıcı adı + parola ile yapılır.
+Uygulama vardiya çizelgesi, personel yönetimi, görev defteri ve akaryakıt satış dashboard'unu tek arayüzde toplar. Giriş Supabase Auth üzerinden kullanıcı adı + parola ile yapılır.
 
 ## Teknoloji
 
@@ -66,10 +66,9 @@ npm run dev
 | Ekran | Açıklama |
 |---|---|
 | Giriş | Supabase Auth kullanıcı adı/parola girişi, oturum kontrolü ve çıkış |
-| Vardiya Çizelgesi | Aylık/haftalık planlama grid'i + Excel içe/dışa aktarım |
+| Vardiya Çizelgesi | Aylık planlama grid'i + Excel içe/dışa aktarım |
 | Personel Listesi | Personel CRUD, işe giriş/çıkış tarihleri, soft delete (Aktif/Pasif filtre) |
-| Günlük Kontrol | Günlük devam durumu takibi (varsayılan: dün) |
-| Raporlar | Devam oranı, departman bazlı devam, gelmeyen personel + Excel export |
+| Görev Defteri | Ekip görev/rutin takibi, yorum ve ek dosya + Excel export |
 | Satış Dashboard | Günlük/özet satış Excel import'u, import konfigürasyonu, KPI/grafikler ve veri gezgini |
 | Ayarlar | İstasyon, departman, görev ekle/sil ve vardiya saatleri |
 
@@ -95,13 +94,12 @@ src/
   components/
     auth/     LoginScreen
     layout/   Sidebar, TopbarMobile, ToastStack
-    schedule/ ScheduleScreen, WeeklyView, MonthlyView, CodeLegend
-    daily/    DailyScreen
+    schedule/ ScheduleScreen, MonthlyView, CodeLegend
     employees/EmployeesScreen
-    reports/  ReportsScreen
+    tasks/    TaskNotebookScreen
     sales/    SalesScreen, import/config/dashboard/explore sekmeleri, chart bileşenleri
     settings/ SettingsScreen
-    modals/   ShiftModal, EmployeeModal, ScheduleImportModal, ScheduleExportModal
+    modals/   ShiftModal, EmployeeModal, TaskModal, ScheduleImportModal, ScheduleExportModal
     ui/       Button, Badge, Avatar, Select, Field, Dialog, Stat, Icon, EmptyState, DropdownButton
   lib/
     supabase.ts        Supabase istemcisi + Auth yardımcıları

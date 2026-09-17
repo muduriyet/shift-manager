@@ -1,9 +1,8 @@
 import type {
   ShiftCodeKey,
-  ShiftStatus, ShiftCodeDef, MonthDay, WeekDay, ShiftTime,
+  ShiftStatus, ShiftCodeDef, MonthDay, ShiftTime,
 } from '../types';
 
-export const STATUSES: ShiftStatus[] = ['Planlandı', 'Geldi', 'Gelmedi'];
 
 export const SHIFT_CODES: Record<ShiftCodeKey, ShiftCodeDef> = {
   'S':  { key: 'S',  label: 'Sabah',       start: '08:00', end: '16:00', cls: 'sc-s',    work: true },
@@ -71,21 +70,6 @@ const _WD_FULL  = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cum
 const _WD_SHORT = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
 export const MONTH_NAMES       = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
 export const MONTH_SHORT_NAMES = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
-const _MONTH_SHORT  = MONTH_SHORT_NAMES;
-
-export function getMonday(d: Date): Date {
-  const dt = new Date(d);
-  const day = dt.getDay(); // 0=Sun, 1=Mon…
-  dt.setDate(dt.getDate() + (day === 0 ? -6 : 1 - day));
-  dt.setHours(0, 0, 0, 0);
-  return dt;
-}
-
-export function addDays(d: Date, n: number): Date {
-  const dt = new Date(d);
-  dt.setDate(dt.getDate() + n);
-  return dt;
-}
 
 export function dateToStr(d: Date): string {
   const y = d.getFullYear();
@@ -102,12 +86,6 @@ export function yearMonthOf(dateStr: string): string {
   return dateStr.slice(0, 7);
 }
 
-export function addMonths(yearMonth: string, delta: number): string {
-  const [y, m] = yearMonth.split('-').map(Number);
-  const d = new Date(y, m - 1 + delta, 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
-
 export function monthBounds(yearMonth: string): { start: string; end: string } {
   const [y, m] = yearMonth.split('-').map(Number);
   const last = new Date(y, m, 0).getDate();
@@ -115,33 +93,6 @@ export function monthBounds(yearMonth: string): { start: string; end: string } {
     start: `${yearMonth}-01`,
     end:   `${yearMonth}-${String(last).padStart(2, '0')}`,
   };
-}
-
-// Aralığın kapsadığı tüm ayları sırayla döndürür ('2026-06' → '2026-07' …).
-export function monthsInRange(startDate: string, endDate: string): string[] {
-  if (!startDate || !endDate || startDate > endDate) return [];
-  const months: string[] = [];
-  let cur = yearMonthOf(startDate);
-  const last = yearMonthOf(endDate);
-  while (cur <= last) {
-    months.push(cur);
-    cur = addMonths(cur, 1);
-  }
-  return months;
-}
-
-export function buildWeekDays(weekStart: Date): WeekDay[] {
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = addDays(weekStart, i);
-    return {
-      key:     _WD_FULL[i],
-      short:   _WD_SHORT[i],
-      date:    `${d.getDate()} ${_MONTH_SHORT[d.getMonth()]}`,
-      dateStr: dateToStr(d),
-      n:       d.getDate(),
-      weekend: i >= 5,
-    };
-  });
 }
 
 export function buildMonthDays(year: number, month: number): MonthDay[] {
@@ -153,10 +104,6 @@ export function buildMonthDays(year: number, month: number): MonthDay[] {
   });
 }
 
-export function getMonthLabel(year: number, month: number): string {
-  return `${MONTH_NAMES[month]} ${year}`;
-}
-
 // ---- Dynamic "today" values ----
 
 export const TODAY_DATE: Date = (() => {
@@ -165,23 +112,3 @@ export const TODAY_DATE: Date = (() => {
   return d;
 })();
 export const TODAY_DATE_STR: string = dateToStr(TODAY_DATE);
-
-// ---- Current week ----
-
-export const THIS_WEEK_START: Date = getMonday(TODAY_DATE);
-export const WEEK_DAYS: WeekDay[]  = buildWeekDays(THIS_WEEK_START);
-export const TODAY_INDEX: number   = WEEK_DAYS.findIndex(d => d.dateStr === TODAY_DATE_STR);
-export const WEEK_LABEL: string    = `${WEEK_DAYS[0].n} – ${WEEK_DAYS[6].n} ${getMonthLabel(THIS_WEEK_START.getFullYear(), THIS_WEEK_START.getMonth())}`;
-export const TODAY_LABEL: string   = `${_WD_FULL[(TODAY_DATE.getDay() + 6) % 7]}, ${TODAY_DATE.getDate()} ${MONTH_NAMES[TODAY_DATE.getMonth()]} ${TODAY_DATE.getFullYear()}`;
-
-// ---- Current month ----
-
-export const MONTH_DAYS: MonthDay[] = buildMonthDays(TODAY_DATE.getFullYear(), TODAY_DATE.getMonth());
-export const MONTH = {
-  name:   getMonthLabel(TODAY_DATE.getFullYear(), TODAY_DATE.getMonth()),
-  short:  _MONTH_SHORT[TODAY_DATE.getMonth()],
-  days:   MONTH_DAYS,
-  todayN: TODAY_DATE.getDate(),
-};
-export const TODAY_N: number    = TODAY_DATE.getDate();
-export const TODAY_MIDX: number = MONTH_DAYS.findIndex(d => d.n === TODAY_N);

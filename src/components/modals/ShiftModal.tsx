@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Shift, Employee, ShiftCodeKey, StationName, DepartmentName, RoleName, ShiftStatus } from '../../types';
-import { STATUSES, SHIFT_TIMES, shiftById, TODAY_DATE_STR, isWithinEmployment } from '../../constants';
+import { SHIFT_TIMES, shiftById, TODAY_DATE_STR, isWithinEmployment } from '../../constants';
 import { Dialog } from '../ui/Dialog';
 import { Button } from '../ui/Button';
 import { Field, Input, Textarea } from '../ui/Field';
@@ -61,7 +61,9 @@ export function ShiftModal({ shift, employees, stationNames, deptNames, roleName
     start:     shift?.start     ?? '08:00',
     end:       shift?.end       ?? '16:00',
     role:      shift?.role      ?? emp0?.role    ?? roleNames[0] ?? '',
-    status:    shift?.status    ?? 'Planlandı',
+    // Devam takibi kaldırıldı: bilgiyi vardiya kodu taşıyor, ayrı bir durum
+    // bayrağı yok. Alan tipte duruyor ama her zaman 'Planlandı'.
+    status:    'Planlandı',
     note:      shift?.note      ?? '',
   });
 
@@ -189,9 +191,6 @@ export function ShiftModal({ shift, employees, stationNames, deptNames, roleName
 
         <Field label="Görev">
           <Select value={form.role} onChange={v => set('role', v as RoleName)} options={roleNames} />
-        </Field>
-        <Field label="Durum">
-          <Select value={form.status} onChange={v => set('status', v as ShiftStatus)} options={STATUSES} />
         </Field>
 
         <div className="col-2">

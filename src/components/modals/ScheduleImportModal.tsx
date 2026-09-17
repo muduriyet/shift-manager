@@ -437,8 +437,7 @@ export function ScheduleImportModal({
               Import tamamlandı. {result.created} kayıt oluşturuldu, {result.updated} kayıt güncellendi, {result.deleted} kayıt silindi. {result.skippedNames.length} Excel satırı personel eşleşmediği için atlandı. {result.failed} kayıt hata aldı.
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10 }}>
-              <ResultLine label="Status korundu" value={result.statusPreserved} />
-              <ResultLine label="Planlandı yapıldı" value={result.resetToPlanned} />
+              <ResultLine label="Değişmeyen hücre" value={result.unchangedCells} />
               <ResultLine label="Hata" value={result.failed} />
             </div>
             <MessageList title="Atlanan İsimler" items={result.skippedNames} />
