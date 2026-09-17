@@ -4,6 +4,7 @@ import { archiveOnboarding, createOnboardingWithEmployee, fetchEmployee, fetchOn
 import { activeDocCount, fmtDMY, stageDef, trLower } from '../../lib/onboarding';
 import { OnboardingModal } from '../modals/OnboardingModal';
 import { OnboardingCreateModal, type OnboardingCreateForm } from '../modals/OnboardingCreateModal';
+import { OnboardingDocDefsModal } from '../modals/OnboardingDocDefsModal';
 import { Button } from '../ui/Button';
 import { Avatar } from '../ui/Avatar';
 import { Icon } from '../ui/Icon';
@@ -49,6 +50,7 @@ export function OnboardingScreen({
   const [station, setStation] = useState('Tümü');
   const [openId, setOpenId] = useState<number | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [defsOpen, setDefsOpen] = useState(false);
 
   // Ekran-yerel fetch (alive guard) — App'in giriş anındaki Promise.all'ına
   // eklenmedi; oradaki bir hata tüm uygulamayı bloke ediyor.
@@ -177,6 +179,7 @@ export function OnboardingScreen({
           <p className="page-desc">Yeni personelin işe giriş adımlarını ve evrak durumunu takip edin</p>
         </div>
         <div className="page-actions">
+          <Button variant="outline" icon="clipboard" onClick={() => setDefsOpen(true)}>Evrak Tanımları</Button>
           <Button icon="plus" onClick={() => setCreateOpen(true)}>Yeni Süreç</Button>
         </div>
       </div>
@@ -311,6 +314,16 @@ export function OnboardingScreen({
           roles={roles}
           onCancel={() => setCreateOpen(false)}
           onSave={handleCreate}
+        />
+      )}
+
+      {defsOpen && (
+        <OnboardingDocDefsModal
+          openCount={list.length}
+          onToast={onToast}
+          // Katalog değiştiyse liste yenilenmeli: asil seti 9'dan 10'a çıkarsa
+          // Evrak kolonundaki n/m paydası da değişir.
+          onClose={degisti => { setDefsOpen(false); if (degisti) void reload(); }}
         />
       )}
     </div>
